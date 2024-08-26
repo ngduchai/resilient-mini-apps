@@ -136,9 +136,9 @@ class TraceRuntimeConfig {
     }
 };
 
-void ckpt_callback(const std::string &ckpt_name, int version) {
-    std::cout << "VELOC_OBSERVE_CKPT_END callback, name = " << ckpt_name << ", version = " << version << std::endl;
-}
+// void ckpt_callback(const std::string &ckpt_name, int version) {
+//     std::cout << "VELOC_OBSERVE_CKPT_END callback, name = " << ckpt_name << ", version = " << version << std::endl;
+// }
 
 int main(int argc, char **argv)
 {
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
 
   /* Initiate veloc */
   veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), argv[1]); // TODO: replace argv[1] with an actual <veloc_cfg>
-  veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
+  // veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
   int curr_ckpt_ver = 0;
   // DataRegionBareBase<float> ckpt_image = recon_image;
   // veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(ckpt_image), veloc::bitsery::deserializer(ckpt_image));
