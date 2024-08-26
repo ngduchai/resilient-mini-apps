@@ -193,7 +193,7 @@ int main(int argc, char **argv)
   /// Reconstructed image
   DataRegionBareBase<float> recon_image(n_blocks*num_cols*num_cols);  
   for(size_t i=0; i<recon_image.count(); ++i) 
-    recon_image[i]=0.; /// Initial values of the reconstructe image
+    recon_image[i]=0.; /// Initial values of the reconstructed image
 
   /// Number of requested ray-sum values by each thread poll
   int64_t req_number = num_cols; 
@@ -209,8 +209,8 @@ int main(int argc, char **argv)
   veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), argv[1]); // TODO: replace argv[1] with an actual <veloc_cfg>
   veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
   int curr_ckpt_ver = 0;
-  DataRegionBase<float, TraceMetadata> ckpt_slices;
-  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(ckpt_slices), veloc::bitsery::deserializer(ckpt_slices));
+  DataRegionBareBase<float> ckpt_image;
+  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(ckpt_image), veloc::bitsery::deserializer(ckpt_image));
 
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 
       /* Checkpoint the reconstructed image (slices) */
       if (!(passes % config.ckpt_freq)) {
-        ckpt_slices = *curr_slices;
+        ckpt_image = recon_image;
         if (!veloc_ckpt->checkpoint("recon", curr_ckpt_ver)){
           throw std::runtime_error("checkpointing failed");
         }
