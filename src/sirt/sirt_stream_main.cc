@@ -8,6 +8,9 @@
 #include "sirt.h"
 #include "trace_stream.h"
 
+#include "veloc.hpp"
+#include "veloc/bitsery.hpp"
+
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
@@ -23,6 +26,7 @@ class TraceRuntimeConfig {
     int dest_port;
     std::string pub_addr;
     int pub_freq = 0;
+    int ckpt_freq = 1;
 
     TraceRuntimeConfig(int argc, char **argv, int rank, int size){
       try
@@ -65,6 +69,10 @@ class TraceRuntimeConfig {
         TCLAP::ValueArg<float> argDestPort(
           "", "dest-port", "Starting port of destination host", false, 5560, "int");
 
+        // Checkpointing params
+        TCLAP::ValueArg<float> argCkptFreq(
+          "", "ckpt-freq", "Checkpointing frequency", false, 1, "int");
+
         cmd.add(argReconOutputPath);
         cmd.add(argReconOutputDir);
         cmd.add(argReconDatasetPath);
@@ -82,6 +90,8 @@ class TraceRuntimeConfig {
         cmd.add(argDestHost);
         cmd.add(argDestPort);
 
+        cmd.add(argCkptFreq);
+
         cmd.parse(argc, argv);
         kReconOutputPath = argReconOutputPath.getValue();
         kReconOutputDir = argReconOutputDir.getValue();
@@ -96,6 +106,8 @@ class TraceRuntimeConfig {
         dest_port= argDestPort.getValue();
         pub_addr= argPubAddr.getValue();
         pub_freq= argPubFreq.getValue();
+
+        ckpt_freq = argCkptFreq.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -113,6 +125,8 @@ class TraceRuntimeConfig {
           std::cout << "Destination port=" << dest_port << std::endl;
           std::cout << "Publisher address=" << pub_addr << std::endl;
           std::cout << "Publish frequency=" << pub_freq << std::endl;
+
+          std::cout << "Checkpointing frequency" << ckpt_freq << std::endl;
         }
       }
       catch (TCLAP::ArgException &e)
@@ -121,6 +135,10 @@ class TraceRuntimeConfig {
       }
     }
 };
+
+void ckpt_callback(const std::string &ckpt_name, int version) {
+    std::cout << "VELOC_OBSERVE_CKPT_END callback, name = " << ckpt_name << ", version = " << version << std::endl;
+}
 
 int main(int argc, char **argv)
 {
@@ -185,7 +203,15 @@ int main(int argc, char **argv)
   h5md.dims= new hsize_t[3];
   h5md.dims[1] = tmetadata.tn_sinograms; 
   h5md.dims[0] = 0;   /// Number of projections is unknown
-  h5md.dims[2] = tmetadata.n_rays_per_proj_row; 
+  h5md.dims[2] = tmetadata.n_rays_per_proj_row;
+
+  /* Initiate veloc */
+  veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), argv[1]); // TODO: replace argv[1] with an actual <veloc_cfg>
+  veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
+  int curr_ckpt_ver = 0;
+  DataRegionBase<float, TraceMetadata> ckpt_slices;
+  veloc_ckpt.mem_protect(0, veloc::bitsery::serializer(ckpt_slices), veloc::bitsery::deserializer(ckpt_slices));
+
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
       auto datagen_beg = std::chrono::system_clock::now();
@@ -251,6 +277,17 @@ int main(int argc, char **argv)
             curr_slices->metadata(), h5md, 
             outputpath, config.kReconDatasetPath);
       }
+
+      /* Checkpoint the reconstructed image (slices) */
+      if (!(passes % config.ckpt_freq)) {
+        ckpt_slices = *curr_slices;
+        if (!ckpt->checkpoint("recon", curr_ckpt_ver)){
+          throw std::runtime_error("checkpointing failed");
+        }
+        std::cout << "Checkpoint #" << curr_ckpt_ver << std::endl;
+        curr_ckpt_ver++
+      }
+
       #ifdef TIMERON
       write_tot += (std::chrono::system_clock::now()-write_beg);
       #endif
