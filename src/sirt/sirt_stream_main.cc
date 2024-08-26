@@ -11,11 +11,6 @@
 #include "veloc.hpp"
 #include "veloc/bitsery.hpp"
 
-#include <map>
-#include <set>
-#include <boost/serialization/set.hpp>
-#include <stdexcept>
-
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;
