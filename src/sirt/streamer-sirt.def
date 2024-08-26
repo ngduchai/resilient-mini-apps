@@ -45,7 +45,8 @@ From: continuumio/miniconda3
     git clone https://github.com/ECP-VeloC/veloc.git /veloc
     cd /veloc
     ./bootstrap.sh
-    ./auto-install.py /usr/local
+    # ./auto-install.py /usr/local
+    ./auto-install.py
 
 
 
