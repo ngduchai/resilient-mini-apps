@@ -210,7 +210,7 @@ int main(int argc, char **argv)
   veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
   int curr_ckpt_ver = 0;
   DataRegionBase<float, TraceMetadata> ckpt_slices;
-  veloc_ckpt.mem_protect(0, veloc::bitsery::serializer(ckpt_slices), veloc::bitsery::deserializer(ckpt_slices));
+  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(ckpt_slices), veloc::bitsery::deserializer(ckpt_slices));
 
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
@@ -281,11 +281,11 @@ int main(int argc, char **argv)
       /* Checkpoint the reconstructed image (slices) */
       if (!(passes % config.ckpt_freq)) {
         ckpt_slices = *curr_slices;
-        if (!ckpt->checkpoint("recon", curr_ckpt_ver)){
+        if (!veloc_ckpt->checkpoint("recon", curr_ckpt_ver)){
           throw std::runtime_error("checkpointing failed");
         }
         std::cout << "Checkpoint #" << curr_ckpt_ver << std::endl;
-        curr_ckpt_ver++
+        curr_ckpt_ver++;
       }
 
       #ifdef TIMERON
