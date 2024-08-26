@@ -12,7 +12,6 @@
 #include "veloc/bitsery.hpp"
 
 #include <map>
-#include <cereal/types/map.hpp>
 #include <set>
 #include <boost/serialization/set.hpp>
 #include <stdexcept>
