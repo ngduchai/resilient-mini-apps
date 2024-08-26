@@ -10,7 +10,6 @@
 
 #include "veloc.hpp"
 #include "veloc/bitsery.hpp"
-#include "veloc/cereal.hpp"
 #include "veloc/boost.hpp"
 
 #include <map>
