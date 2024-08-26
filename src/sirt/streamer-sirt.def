@@ -37,8 +37,17 @@ From: continuumio/miniconda3
     make -j
     make install
 
+    # Clone the VeloC repository and build it
+    git clone -b 'veloc-1.7' --depth 1 https://github.com/ECP-VeloC/veloc.git /veloc
+    cd /veloc
+    ./bootstrap.sh
+    ./auto-install.sh
+
+
+
     # Clone the aps-mini-apps repository
-    git clone https://github.com/diaspora-project/aps-mini-apps.git /aps-mini-apps
+    # git clone https://github.com/diaspora-project/aps-mini-apps.git /aps-mini-apps
+    # git clone https://github.com/ngduchai/resilient-mini-apps.git /aps-mini-apps
     cd /aps-mini-apps
     git fetch origin
     git checkout master
