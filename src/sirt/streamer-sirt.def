@@ -30,6 +30,10 @@ From: continuumio/miniconda3
     # Upgrade pip
     pip install --upgrade pip
 
+    # Add bitsery for serialization
+    git clone https://github.com/fraillt/bitsery.git /bitsery
+    cp -r bitsery/include/* /usr/include
+
     # Clone the flatbuffers repository and build it
     git clone https://github.com/google/flatbuffers.git /flatbuffers
     cd /flatbuffers
