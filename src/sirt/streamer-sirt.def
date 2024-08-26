@@ -47,7 +47,7 @@ From: continuumio/miniconda3
 
     # Clone the aps-mini-apps repository
     # git clone https://github.com/diaspora-project/aps-mini-apps.git /aps-mini-apps
-    # git clone https://github.com/ngduchai/resilient-mini-apps.git /aps-mini-apps
+    git clone https://github.com/ngduchai/resilient-mini-apps.git /aps-mini-apps
     cd /aps-mini-apps
     git fetch origin
     git checkout master
