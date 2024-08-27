@@ -140,6 +140,10 @@ class TraceRuntimeConfig {
 //     std::cout << "VELOC_OBSERVE_CKPT_END callback, name = " << ckpt_name << ", version = " << version << std::endl;
 // }
 
+template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
+  // TODO: Serialize recon image
+}
+
 int main(int argc, char **argv)
 {
   /* Initiate middleware's communication layer */
