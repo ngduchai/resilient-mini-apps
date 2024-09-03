@@ -56,9 +56,21 @@ class ADataRegion {
 
     friend bitsery::Access;
     template<typename S> void serialize(S& s) {
-      s.value8b(o.count_);
-      s.container8b(o.data_, o.count_);
-      s.value8b(o.index_);
+      s.value8b(this->count_);
+      s.value8b(this->index_);
+      switch (sizeof(T)) {
+        case 1:
+          s.container1b(this->data_, this->count_);
+          break;
+        case 2:
+          s.container2b(this->data_, this->count_);
+          break;
+        case 4:
+          s.container4b(this->data_, this->count_);
+          break;
+        default:
+          s.container8b(this->data_, this->count_);
+      }
     }
 
   protected:

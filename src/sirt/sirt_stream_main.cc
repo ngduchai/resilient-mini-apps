@@ -140,6 +140,7 @@ class TraceRuntimeConfig {
 //     std::cout << "VELOC_OBSERVE_CKPT_END callback, name = " << ckpt_name << ", version = " << version << std::endl;
 // }
 
+
 template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
   s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
 }
