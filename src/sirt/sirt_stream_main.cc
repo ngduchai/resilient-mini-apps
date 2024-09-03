@@ -209,13 +209,25 @@ int main(int argc, char **argv)
   h5md.dims[0] = 0;   /// Number of projections is unknown
   h5md.dims[2] = tmetadata.n_rays_per_proj_row;
 
-  /* Initiate veloc */
-  veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), argv[1]); // TODO: replace argv[1] with an actual <veloc_cfg>
+  /* Initiate VeloC */
+  veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), "sirt_stream.cfg");
+  const char* veloc_ckpt_name = "sirt_stream";
   // veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
-  int curr_ckpt_ver = 0;
   // DataRegionBareBase<float> ckpt_image = recon_image;
-  // veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(ckpt_image), veloc::bitsery::deserializer(ckpt_image));
-  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(recon_image), veloc::bitsery::deserializer(recon_image));
+  
+  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(recon_image),
+        veloc::bitsery::deserializer(recon_image));
+
+  int curr_ckpt_ver = veloc_ckpt->restart_test(veloc_ckpt_name, 0);
+  if (curr_ckpt_ver > 0) {
+        std::cout << "Found a checkpoint version " << curr_ckpt_ver << ", initiating restart" << std::endl;
+        if (!ckpt->restart(veloc_ckpt_name, curr_ckpt_ver)) {
+            throw std::runtime_error("restart failed");
+        }
+    }else {
+        curr_ckpt_ver = 0;
+    }
+    std::cout << "Start the reconstruction from version #" << v << std::endl;
 
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
@@ -286,11 +298,11 @@ int main(int argc, char **argv)
       /* Checkpoint the reconstructed image (slices) */
       if (!(passes % config.ckpt_freq)) {
         // ckpt_image = recon_image;
-        if (!veloc_ckpt->checkpoint("recon", curr_ckpt_ver)){
+        curr_ckpt_ver++;
+        if (!veloc_ckpt->checkpoint(veloc_ckpt_name, curr_ckpt_ver)){
           throw std::runtime_error("checkpointing failed");
         }
-        std::cout << "Checkpoint #" << curr_ckpt_ver << std::endl;
-        curr_ckpt_ver++;
+        std::cout << "Checkpointed reconstruction version #" << curr_ckpt_ver << std::endl;
       }
 
       #ifdef TIMERON

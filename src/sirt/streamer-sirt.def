@@ -69,5 +69,10 @@ From: continuumio/miniconda3
     cmake ..
     make
     cd /aps-mini-apps/build/bin
+    
+    # Setup VeloC
+    mkdir tmp
+    cp ../../src/sirt_stream.cfg .
+
 
 

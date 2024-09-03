@@ -23,6 +23,8 @@ if(NOT HDF5_FOUND OR NOT HDF5_IS_PARALLEL)
     message(FATAL_ERROR "HDF5 library not compiled with parallel support.")
 endif()
 
+find_package(veloc REQUIRED)
+
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
@@ -35,5 +37,5 @@ add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads)
+target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads veloc-client)
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})
