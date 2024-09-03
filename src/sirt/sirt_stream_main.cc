@@ -141,9 +141,7 @@ class TraceRuntimeConfig {
 // }
 
 template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
-  s.value8b(o.count_);
-  s.container8b(o.data_, o.count_);
-  s.value8b(o.index_);
+  s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
 }
 
 int main(int argc, char **argv)

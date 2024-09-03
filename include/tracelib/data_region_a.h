@@ -14,6 +14,9 @@
 #include <vector>
 #include "mirrored_region_bare_base.h"
 
+#include <bitsery/bitsery.h>
+#include <bitsery/ext/inheritance.h>
+
 template <typename T> 
 class ADataRegion {
   private:
@@ -51,6 +54,12 @@ class ADataRegion {
       index_ = 0;
     }
 
+    friend bitsery::Access;
+    template<typename S> void serialize(S& s) {
+      s.value8b(o.count_);
+      s.container8b(o.data_, o.count_);
+      s.value8b(o.index_);
+    }
 
   protected:
     /**
