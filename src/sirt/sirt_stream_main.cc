@@ -141,7 +141,9 @@ class TraceRuntimeConfig {
 // }
 
 template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
-  // TODO: Serialize recon image
+  s.value8b(o.count_);
+  s.container8b(o.data_, o.count_);
+  s.value8b(o.index_);
 }
 
 int main(int argc, char **argv)
