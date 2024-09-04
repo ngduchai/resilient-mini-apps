@@ -16,6 +16,7 @@
 
 #include <bitsery/bitsery.h>
 #include <bitsery/ext/inheritance.h>
+#include <bitsery/ext/pointer.h>
 
 template <typename T> 
 class ADataRegion {
