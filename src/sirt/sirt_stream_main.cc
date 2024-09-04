@@ -142,7 +142,15 @@ class TraceRuntimeConfig {
 
 
 template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
-  s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
+  // s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
+  s.value8b(o.count());
+  s.value8b(o.index());
+  double * data = new double [o.count()];
+  for (int i = 0; i < o.count(); ++i) {
+    data[i] = o[i];
+  }
+  s.container8b(data, o.count());
+  delete [] data;
 }
 
 int main(int argc, char **argv)
@@ -222,13 +230,13 @@ int main(int argc, char **argv)
   int curr_ckpt_ver = veloc_ckpt->restart_test(veloc_ckpt_name, 0);
   if (curr_ckpt_ver > 0) {
         std::cout << "Found a checkpoint version " << curr_ckpt_ver << ", initiating restart" << std::endl;
-        if (!ckpt->restart(veloc_ckpt_name, curr_ckpt_ver)) {
+        if (!veloc_ckpt->restart(veloc_ckpt_name, curr_ckpt_ver)) {
             throw std::runtime_error("restart failed");
         }
     }else {
         curr_ckpt_ver = 0;
     }
-    std::cout << "Start the reconstruction from version #" << v << std::endl;
+    std::cout << "Start the reconstruction from version #" << curr_ckpt_ver << std::endl;
 
   for(int passes=0; ; ++passes){
       #ifdef TIMERON
