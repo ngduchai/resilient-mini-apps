@@ -141,17 +141,17 @@ class TraceRuntimeConfig {
 // }
 
 
-template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
-  // s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
-  s.value8b(o.count());
-  s.value8b(o.index());
-  double * data = new double [o.count()];
-  for (int i = 0; i < o.count(); ++i) {
-    data[i] = o[i];
-  }
-  s.container8b(data, o.count());
-  delete [] data;
-}
+// template <typename S> void serialize(S &s, DataRegionBareBase<float> &o) {
+//   s.ext(o, bitsery::ext::BaseClass<ADataRegion<float>>{});
+//   // s.value8b(o.count());
+//   // s.value8b(o.index());
+//   // double * data = new double [o.count()];
+//   // for (int i = 0; i < o.count(); ++i) {
+//   //   data[i] = o[i];
+//   // }
+//   // s.container8b(data, o.count());
+//   // delete [] data;
+// }
 
 int main(int argc, char **argv)
 {
