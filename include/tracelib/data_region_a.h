@@ -58,19 +58,21 @@ class ADataRegion {
     template<typename S> void serialize(S& s) {
       s.value8b(this->count_);
       s.value8b(this->index_);
-      switch (sizeof(T)) {
-        case 1:
-          s.container1b(this->data_, this->count_);
-          break;
-        case 2:
-          s.container2b(this->data_, this->count_);
-          break;
-        case 4:
-          s.container4b(this->data_, this->count_);
-          break;
-        default:
-          s.container8b(this->data_, this->count_);
-      }
+      // switch (sizeof(T)) {
+      //   case 1:
+      //     s.container1b(this->data_, this->count_);
+      //     break;
+      //   case 2:
+      //     s.container2b(this->data_, this->count_);
+      //     break;
+      //   case 4:
+      //     s.container4b(this->data_, this->count_);
+      //     break;
+      //   default:
+      //     s.container8b(this->data_, this->count_);
+      // }
+      s.ext8b(this->data_,
+          bitsery::ext::pointerOwner{bitsery::ext::PointerType::NotNull});
     }
 
   protected:
