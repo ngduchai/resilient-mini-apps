@@ -1,7 +1,0 @@
-# Build
-$ mkdir build; cd build; cmake ..; make; mkdir tmp;
-
-# To reconstruct
-$ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 5 2 ../art_simple.cfg
-
-
