@@ -22,7 +22,13 @@ $ ./build.sh
 
 ## To reconstruct
 
-Try
+Go to the build directory
+
+```bash
+cd build
+```
+
+then try
 
 ```bash
 $ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 <# outer iterations> <# inner iterations> ../art_simple.cfg
