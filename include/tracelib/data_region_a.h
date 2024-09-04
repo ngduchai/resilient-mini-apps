@@ -72,7 +72,7 @@ class ADataRegion {
       //     s.container8b(this->data_, this->count_);
       // }
       s.ext8b(this->data_,
-          bitsery::ext::pointerOwner{bitsery::ext::PointerType::NotNull});
+          bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
     }
 
   protected:
