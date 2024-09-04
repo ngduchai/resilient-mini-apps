@@ -5,6 +5,8 @@
 
 #include "veloc.hpp"
 
+#include "mpi.h"
+
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
     float* transposed= new float[x*y*z];
@@ -35,11 +37,21 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
 
 int main(int argc, char* argv[])
 {
-    std::cout << "argc: " << argc << std::endl;
 
-    if(argc != 5 && argc != 6) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> [check_point_path]" << std::endl;
+    if (argc != 6) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> [veloc config]" << std::endl;
         return 1;
+    }
+
+    /* Initiate MPI Communication */
+    MPI_Init(argc, argv);
+    int id;
+    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+    int num_workers;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
+
+    if (id == 0) {
+        std::cout << "argc: " << argc << std::endl;
     }
 
     const char* filename = argv[1];
@@ -48,7 +60,6 @@ int main(int argc, char* argv[])
     int num_iter = atoi(argv[4]);
     // const char* check_point_path = (argc == 6) ? argv[5] : nullptr;
     const char* check_point_config = (argc == 6) ? argv[5] : "art_simple.cfg";
-
 
     // Open tomo_00058_all_subsampled1p_ HDF5 file
     //const char* filename = "../../data/tomo_00058_all_subsampled1p_s1079s1081.h5";
@@ -104,13 +115,23 @@ int main(int argc, char* argv[])
     //int num_iter = 2;
     //int num_outer_iter = 5;
     //float center = 294.078;
-    float *recon = new float[dy*ngridx*ngridy];
+
+    const unsigned int recon_size = dy*ngridx*ngridy
+    float *recon = new float[recon_size];
+
+    /* Calculating the working area based on worker id */
+    int w_dt = dt;
+    int w_dy = dy;
+    int w_dx = dx;
+    int w_ngridx = ngridx;
+    int w_ngridy = ngridy;
+
+    std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // Initiate VeloC
-    const unsigned int id = 0;
     veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
 
-    ckpt->mem_protect(0, recon, sizeof(float), dy*ngridx*ngridy);
+    ckpt->mem_protect(0, recon, sizeof(float), recon_size);
     const char* ckpt_name = "art_simple";
 
     int v = ckpt->restart_test(ckpt_name, 0);
@@ -142,7 +163,7 @@ int main(int argc, char* argv[])
     //     H5Fclose(check_point_file_id);
     // }
 
-    std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
+    std::cout << "ID: " << id <<  ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // swap axis in data dt dy
     float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
@@ -192,6 +213,8 @@ int main(int argc, char* argv[])
     delete[] data_swap;
     delete[] theta;
     delete[] recon;
+
+    MPI_Finalize();
 
     return 0;
 }
