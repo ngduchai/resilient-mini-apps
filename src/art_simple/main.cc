@@ -3,6 +3,8 @@
 #include "art_simple.h"
 #include "hdf5.h"
 
+#include "veloc.hpp"
+
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
     float* transposed= new float[x*y*z];
@@ -44,7 +46,8 @@ int main(int argc, char* argv[])
     float center = atof(argv[2]);
     int num_outer_iter = atoi(argv[3]);
     int num_iter = atoi(argv[4]);
-    const char* check_point_path = (argc == 6) ? argv[5] : nullptr;
+    // const char* check_point_path = (argc == 6) ? argv[5] : nullptr;
+    const char* check_point_config = (argc == 6) ? argv[5] : "art_simple.cfg";
 
 
     // Open tomo_00058_all_subsampled1p_ HDF5 file
@@ -103,23 +106,41 @@ int main(int argc, char* argv[])
     //float center = 294.078;
     float *recon = new float[dy*ngridx*ngridy];
 
-    if(check_point_path != nullptr) {
-        std::cout << "Check point path: " << check_point_path << std::endl;
-        // read recon data from checkpointing file /recon
-        hid_t check_point_file_id = H5Fopen(check_point_path, H5F_ACC_RDONLY, H5P_DEFAULT);
-        if (check_point_file_id < 0) {
-            std::cerr << "Error: Unable to open file " << check_point_path << std::endl;
-            return 1;
+    // Initiate VeloC
+    const unsigned int id = 0;
+    veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
+
+    ckpt->mem_protect(0, recon, sizeof(float), dy*ngridx*ngridy);
+    const char* ckpt_name = "art_simple";
+
+    int v = ckpt->restart_test(ckpt_name, 0);
+    if (v > 0) {
+        std::cout << "Found a checkpoint version " << v << " at iteration #" << v-1 << ", initiating restart" << std::endl;
+        if (!ckpt->restart(ckpt_name, v)) {
+            throw std::runtime_error("restart failed");
         }
-        hid_t check_point_dataset_id = H5Dopen(check_point_file_id, "/recon", H5P_DEFAULT);
-        if (check_point_dataset_id < 0) {
-            std::cerr << "Error: Unable to open dataset /recon" << std::endl;
-            return 1;
-        }
-        H5Dread(check_point_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-        H5Dclose(check_point_dataset_id);
-        H5Fclose(check_point_file_id);
+    }else {
+        v = 0;
     }
+    std::cout << "Start the reconstruction from iteration #" << v << std::endl;
+
+    // if(check_point_path != nullptr) {
+    //     std::cout << "Check point path: " << check_point_path << std::endl;
+    //     // read recon data from checkpointing file /recon
+    //     hid_t check_point_file_id = H5Fopen(check_point_path, H5F_ACC_RDONLY, H5P_DEFAULT);
+    //     if (check_point_file_id < 0) {
+    //         std::cerr << "Error: Unable to open file " << check_point_path << std::endl;
+    //         return 1;
+    //     }
+    //     hid_t check_point_dataset_id = H5Dopen(check_point_file_id, "/recon", H5P_DEFAULT);
+    //     if (check_point_dataset_id < 0) {
+    //         std::cerr << "Error: Unable to open dataset /recon" << std::endl;
+    //         return 1;
+    //     }
+    //     H5Dread(check_point_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+    //     H5Dclose(check_point_dataset_id);
+    //     H5Fclose(check_point_file_id);
+    // }
 
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
@@ -132,14 +153,22 @@ int main(int argc, char* argv[])
         std::cout << "Outer iteration: " << i << std::endl;
         art(data_swap, dy, dt, dx, &center, theta, recon, ngridx, ngridy, num_iter);
 
+        // Checkpointing
+        if (!ckpt->checkpoint(ckpt_name, v+i+1)) {
+            throw std::runtime_error("Checkpointing failured");
+        }
+        std::cout << "Checkpointed version " << v+i+1 << std::endl;
+
         // write the reconstructed data to a file
         // Create the output file name
         std::ostringstream oss;
-        if (check_point_path != nullptr) {
-            oss << "cont_recon_" << i << ".h5";
-        } else {
-            oss << "recon_" << i << ".h5";
-        }
+        // if (check_point_path != nullptr) {
+        //     oss << "cont_recon_" << i << ".h5";
+        // } else {
+        //     oss << "recon_" << i << ".h5";
+        // }
+        oss << "recon_" << i << ".h5";
+
         std::string output_filename = oss.str();
         const char* output_filename_cstr = output_filename.c_str();
 

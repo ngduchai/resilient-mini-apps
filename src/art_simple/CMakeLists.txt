@@ -6,8 +6,10 @@ project(art_simple_main)
 # Find the HDF5 library
 find_package(HDF5 REQUIRED)
 
+find_package(veloc REQUIRED)
+
 # Add an executable
 add_executable(art_simple_main main.cc art_simple.cc)
 
 # Link the HDF5 library
-target_link_libraries(art_simple_main HDF5::HDF5)
+target_link_libraries(art_simple_main HDF5::HDF5 veloc-client)
