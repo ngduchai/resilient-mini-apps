@@ -11,6 +11,8 @@
 #include "veloc.hpp"
 #include "veloc/bitsery.hpp"
 
+
+
 class TraceRuntimeConfig {
   public:
     std::string kReconOutputPath;

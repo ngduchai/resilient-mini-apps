@@ -34,6 +34,13 @@ From: continuumio/miniconda3
     git clone https://github.com/fraillt/bitsery.git /bitsery
     cp -r bitsery/include/* /usr/include
 
+    # Install cereal for serialization
+    git clone https://github.com/USCiLab/cereal.git
+    cd cereal
+    cmake .
+    make
+    make install
+
     # Clone the flatbuffers repository and build it
     git clone https://github.com/google/flatbuffers.git /flatbuffers
     cd /flatbuffers

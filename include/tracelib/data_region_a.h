@@ -14,10 +14,6 @@
 #include <vector>
 #include "mirrored_region_bare_base.h"
 
-#include <bitsery/bitsery.h>
-#include <bitsery/ext/inheritance.h>
-#include <bitsery/ext/pointer.h>
-
 template <typename T> 
 class ADataRegion {
   private:
@@ -54,30 +50,16 @@ class ADataRegion {
       }
       index_ = 0;
     }
-
-    friend bitsery::Access;
-    template<typename S> void serialize(S& s) {
-      s.value8b(this->count_);
-      s.value8b(this->index_);
-      // switch (sizeof(T)) {
-      //   case 1:
-      //     s.ext1b(this->data_,
-      //         bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
-      //     break;
-      //   case 2:
-      //     s.ext2b(this->data_,
-      //         bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
-      //     break;
-      //   case 4:
-      //     s.ext4b(this->data_,
-      //         bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
-      //     break;
-      //   default:
-      //     s.ext8b(this->data_,
-      //         bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
-      // }
-      s.ext4b(this->data_,
-          bitsery::ext::PointerOwner{bitsery::ext::PointerType::NotNull});
+    
+    template<class Archive>
+    void serialize(Archive& archive) {
+      archive & this->count_;
+      archive & this->index_;
+      if (Archieve::is_loading::value) {
+        assert(this->data_ == nullptr);
+        this->data_ = new T[this->count_];
+      }
+      archive & make_array<T>(this->data_, this->count_);
     }
 
   protected:
