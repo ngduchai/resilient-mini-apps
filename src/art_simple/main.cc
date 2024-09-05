@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include "art_simple.h"
 #include "hdf5.h"
 
@@ -49,8 +50,9 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &id);
     int num_workers;
     MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
+    const unsigned int mpi_root = 0
 
-    if (id == 0) {
+    if (id == mpi_root) {
         std::cout << "argc: " << argc << std::endl;
     }
 
@@ -120,18 +122,27 @@ int main(int argc, char* argv[])
     float *recon = new float[recon_size];
 
     /* Calculating the working area based on worker id */
+    int rows_per_worker = dy / num_workers;
+    int extra_rows = dy % num_workers;
+    int w_offset = rows_per_worker*id + std::min(id, extra_rows);
+    if (extra_rows != 0 && id < extra_rows) {
+        rows_per_worker++;
+    }
     int w_dt = dt;
-    int w_dy = dy;
+    int w_dy = rows_per_worker;
     int w_dx = dx;
     int w_ngridx = ngridx;
     int w_ngridy = ngridy;
+
+    float * w_recon = recon + w_offset*ngridx*ngridy;
+    const unsigned int w_recon_size = rows_per_worker*ngridx*ngridy;
 
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // Initiate VeloC
     veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
 
-    ckpt->mem_protect(0, recon, sizeof(float), recon_size);
+    ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
     const char* ckpt_name = "art_simple";
 
     int v = ckpt->restart_test(ckpt_name, 0);
@@ -145,31 +156,13 @@ int main(int argc, char* argv[])
     }
     std::cout << "Start the reconstruction from iteration #" << v << std::endl;
 
-    // if(check_point_path != nullptr) {
-    //     std::cout << "Check point path: " << check_point_path << std::endl;
-    //     // read recon data from checkpointing file /recon
-    //     hid_t check_point_file_id = H5Fopen(check_point_path, H5F_ACC_RDONLY, H5P_DEFAULT);
-    //     if (check_point_file_id < 0) {
-    //         std::cerr << "Error: Unable to open file " << check_point_path << std::endl;
-    //         return 1;
-    //     }
-    //     hid_t check_point_dataset_id = H5Dopen(check_point_file_id, "/recon", H5P_DEFAULT);
-    //     if (check_point_dataset_id < 0) {
-    //         std::cerr << "Error: Unable to open dataset /recon" << std::endl;
-    //         return 1;
-    //     }
-    //     H5Dread(check_point_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-    //     H5Dclose(check_point_dataset_id);
-    //     H5Fclose(check_point_file_id);
-    // }
-
-    std::cout << "ID: " << id <<  ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
+    std::cout << "ID: " << id << ", offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // swap axis in data dt dy
     float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
 
     // run the reconstruction
-    for (int i = 0; i < num_outer_iter; i++)
+    for (int i = v; i < num_outer_iter; i++)
     {
         std::cout << "Outer iteration: " << i << std::endl;
         art(data_swap, dy, dt, dx, &center, theta, recon, ngridx, ngridy, num_iter);
@@ -179,33 +172,36 @@ int main(int argc, char* argv[])
             throw std::runtime_error("Checkpointing failured");
         }
         std::cout << "Checkpointed version " << v+i+1 << std::endl;
-
-        // write the reconstructed data to a file
-        // Create the output file name
-        std::ostringstream oss;
-        // if (check_point_path != nullptr) {
-        //     oss << "cont_recon_" << i << ".h5";
-        // } else {
-        //     oss << "recon_" << i << ".h5";
-        // }
-        oss << "recon_" << i << ".h5";
-
-        std::string output_filename = oss.str();
-        const char* output_filename_cstr = output_filename.c_str();
-
-        hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-        if (output_file_id < 0) {
-            std::cerr << "Error: Unable to create file " << output_filename << std::endl;
-            return 1;
-        }
-        hsize_t output_dims[3] = {dy, ngridy, ngridx};
-        hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-        hid_t output_dataset_id = H5Dcreate(output_file_id, "/recon", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-        H5Dclose(output_dataset_id);
-        H5Sclose(output_dataspace_id);
-        H5Fclose(output_file_id);
     }
+
+    // Collect reconstructed data from workers
+    MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+
+    // write the reconstructed data to a file
+    // Create the output file name
+    std::ostringstream oss;
+    // if (check_point_path != nullptr) {
+    //     oss << "cont_recon_" << i << ".h5";
+    // } else {
+    //     oss << "recon_" << i << ".h5";
+    // }
+    oss << "recon.h5";
+
+    std::string output_filename = oss.str();
+    const char* output_filename_cstr = output_filename.c_str();
+
+    hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (output_file_id < 0) {
+        std::cerr << "Error: Unable to create file " << output_filename << std::endl;
+        return 1;
+    }
+    hsize_t output_dims[3] = {dy, ngridy, ngridx};
+    hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+    hid_t output_dataset_id = H5Dcreate(output_file_id, "/recon", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+    H5Dclose(output_dataset_id);
+    H5Sclose(output_dataspace_id);
+    H5Fclose(output_file_id);
 
 
     // free the memory
