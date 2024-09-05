@@ -15,7 +15,8 @@ From: continuumio/miniconda3
         iptables \
         iputils-ping \
         iproute2 \
-        nano
+        nano \
+        libboost-all-dev
 
     # Install necessary conda packages
     conda install -y \
