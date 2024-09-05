@@ -14,6 +14,8 @@
 #include <vector>
 #include "mirrored_region_bare_base.h"
 
+#include <experimental/array>
+
 template <typename T> 
 class ADataRegion {
   private:
@@ -55,11 +57,11 @@ class ADataRegion {
     void serialize(Archive& archive) {
       archive & this->count_;
       archive & this->index_;
-      if (Archieve::is_loading::value) {
+      if (Archive::is_loading::value) {
         assert(this->data_ == nullptr);
         this->data_ = new T[this->count_];
       }
-      archive & make_array<T>(this->data_, this->count_);
+      archive & std::experimental::make_array<T>(this->data_, this->count_);
     }
 
   protected:

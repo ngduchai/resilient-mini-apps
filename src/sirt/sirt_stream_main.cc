@@ -9,7 +9,7 @@
 #include "trace_stream.h"
 
 #include "veloc.hpp"
-#include "veloc/bitsery.hpp"
+#include "veloc/cereal.hpp"
 
 
 
@@ -226,8 +226,8 @@ int main(int argc, char **argv)
   // veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
   // DataRegionBareBase<float> ckpt_image = recon_image;
   
-  veloc_ckpt->mem_protect(0, veloc::bitsery::serializer(recon_image),
-        veloc::bitsery::deserializer(recon_image));
+  veloc_ckpt->mem_protect(0, veloc::cereal::serializer(recon_image),
+        veloc::cereal::deserializer(recon_image));
 
   int curr_ckpt_ver = veloc_ckpt->restart_test(veloc_ckpt_name, 0);
   if (curr_ckpt_ver > 0) {
