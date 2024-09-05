@@ -14,7 +14,7 @@
 #include <vector>
 #include "mirrored_region_bare_base.h"
 
-#include <experimental/array>
+#include <array>
 
 template <typename T> 
 class ADataRegion {
@@ -61,7 +61,7 @@ class ADataRegion {
         assert(this->data_ == nullptr);
         this->data_ = new T[this->count_];
       }
-      archive & std::experimental::make_array<T>(this->data_, this->count_);
+      archive & std::to_array<T>(this->data_, this->count_);
     }
 
   protected:
