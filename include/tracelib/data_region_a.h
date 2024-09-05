@@ -62,7 +62,7 @@ class ADataRegion {
         assert(this->data_ == nullptr);
         this->data_ = new T[this->count_];
       }
-      archive & boost::serialization::to_array<T>(this->data_, this->count_);
+      archive & boost::serialization::make_array<T>(this->data_, this->count_);
     }
 
   protected:
