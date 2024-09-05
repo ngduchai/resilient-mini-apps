@@ -45,12 +45,12 @@ int main(int argc, char* argv[])
     }
 
     /* Initiate MPI Communication */
-    MPI_Init(argc, argv);
+    MPI_Init(&argc, &argv);
     int id;
     MPI_Comm_rank(MPI_COMM_WORLD, &id);
     int num_workers;
     MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
-    const unsigned int mpi_root = 0
+    const unsigned int mpi_root = 0;
 
     if (id == mpi_root) {
         std::cout << "argc: " << argc << std::endl;
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
     //int num_outer_iter = 5;
     //float center = 294.078;
 
-    const unsigned int recon_size = dy*ngridx*ngridy
+    const unsigned int recon_size = dy*ngridx*ngridy;
     float *recon = new float[recon_size];
 
     /* Calculating the working area based on worker id */
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
     }
     std::cout << "Start the reconstruction from iteration #" << v << std::endl;
 
-    std::cout << "ID: " << id << ", offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
+    std::cout << "ID: " << id << ", offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // swap axis in data dt dy
     float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
     for (int i = v; i < num_outer_iter; i++)
     {
         std::cout << "Outer iteration: " << i << std::endl;
-        art(data_swap, dy, dt, dx, &center, theta, recon, ngridx, ngridy, num_iter);
+        art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
         // Checkpointing
         if (!ckpt->checkpoint(ckpt_name, v+i+1)) {
