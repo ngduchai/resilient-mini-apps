@@ -8,8 +8,8 @@ From: continuumio/miniconda3
         libzmq3-dev \
         swig \
         git \
-        libmpich-dev \
-        libhdf5-mpich-dev \
+        #libmpich-dev \
+        #libhdf5-mpich-dev \
         apt-utils \
         net-tools \
         iptables \
