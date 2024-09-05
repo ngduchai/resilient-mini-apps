@@ -9,7 +9,7 @@ add_definitions(-DTIMERON)
 find_package(Flatbuffers REQUIRED)
 include_directories(${FLATBUFFERS_INCLUDE_DIR})
 
-find_package(MPI REQUIRED)
+find_package(MPI 4.0 REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
