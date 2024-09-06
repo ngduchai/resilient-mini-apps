@@ -8,8 +8,11 @@ find_package(HDF5 REQUIRED)
 
 find_package(veloc REQUIRED)
 
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
+
 # Add an executable
 add_executable(art_simple_main main.cc art_simple.cc)
 
 # Link the HDF5 library
-target_link_libraries(art_simple_main HDF5::HDF5 veloc-client)
+target_link_libraries(art_simple_main HDF5::HDF5 veloc-client MPI::MPI_CXX)
