@@ -9,7 +9,9 @@ add_definitions(-DTIMERON)
 find_package(Flatbuffers REQUIRED)
 include_directories(${FLATBUFFERS_INCLUDE_DIR})
 
-find_package(MPI 4.0 REQUIRED)
+# Use MPICH
+set(MPI_EXECUTABLE_SUFFIX .mpich)
+find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
