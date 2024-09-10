@@ -17,6 +17,8 @@
 #include <array>
 #include <boost/serialization/array.hpp>
 
+#include <assert.h>
+
 template <typename T> 
 class ADataRegion {
   private:
@@ -53,9 +55,16 @@ class ADataRegion {
       }
       index_ = 0;
     }
-    
+
+    /* Accesses for serialization */
+    friend class boost::serialization::access;
+
+    /**
+     * \brief Serialize the internal data. Can be used
+     *  for transmission and checkpointing
+     */
     template<class Archive>
-    void serialize(Archive& archive) {
+    void serialize(Archive& archive, const unsigned int /* version */) {
       archive & this->count_;
       archive & this->index_;
       if (Archive::is_loading::value) {
@@ -104,6 +113,7 @@ class ADataRegion {
 
 
   public:
+
     /**
      * \brief Contructor for creating a data region with \p count number of items.
      * \param[in] count The number items this data region has.
@@ -272,6 +282,7 @@ class ADataRegion {
      * using #DeleteMirroredRegions(). 
      */
     void ResetMirroredRegionIter();
+
 };
 
 

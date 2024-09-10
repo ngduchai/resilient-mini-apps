@@ -31,13 +31,13 @@ cd build
 then try
 
 ```bash
-$ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 <# outer iterations> <# inner iterations> ../art_simple.cfg
+$ mpiexec -np <# processes> ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 <# outer iterations> <# inner iterations> ../art_simple.cfg
 ```
     
 For examples
 
 ```bash
-$ ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 5 2 ../art_simple.cfg
+$ mpiexec -np 2 ./art_simple_main ../../../data/tooth_preprocessed.h5 294.078 5 2 ../art_simple.cfg
 ```
 
 

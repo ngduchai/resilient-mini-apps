@@ -1,4 +1,4 @@
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror")
@@ -27,6 +27,9 @@ endif()
 
 find_package(veloc REQUIRED)
 
+find_package(Boost COMPONENTS serialization)
+include_directories(${Boost_INCLUDE_DIR})
+
 include_directories(${Trace_SOURCE_DIR}/include)
 include_directories(${Trace_SOURCE_DIR}/include/tracelib)
 include_directories(${HDF5_INCLUDE_DIRS})
@@ -39,5 +42,5 @@ add_library(sirt ${CMAKE_CURRENT_LIST_DIR}/sirt.cc)
 
 
 add_executable(sirt_stream sirt_stream_main.cc)
-target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 Threads::Threads veloc-client)
+target_link_libraries(sirt_stream trace_stream trace_mq sirt trace_utils trace_h5io zmq MPI::MPI_CXX hdf5::hdf5 veloc-client Threads::Threads ${Boost_LIBRARIES})
 #target_include_directories(sirt_stream PRIVATE ${HDF5_INCLUDE_DIRS})

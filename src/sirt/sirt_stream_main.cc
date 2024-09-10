@@ -9,7 +9,8 @@
 #include "trace_stream.h"
 
 #include "veloc.hpp"
-#include "veloc/cereal.hpp"
+#include "veloc/boost.hpp"
+// #include "veloc/cereal.hpp"
 
 
 
@@ -29,6 +30,7 @@ class TraceRuntimeConfig {
     std::string pub_addr;
     int pub_freq = 0;
     int ckpt_freq = 1;
+    std::string ckpt_config;
 
     TraceRuntimeConfig(int argc, char **argv, int rank, int size){
       try
@@ -74,6 +76,8 @@ class TraceRuntimeConfig {
         // Checkpointing params
         TCLAP::ValueArg<float> argCkptFreq(
           "", "ckpt-freq", "Checkpointing frequency", false, 1, "int");
+        TCLAP::ValueArg<std::string> argCkptConfig(
+          "", "ckpt-config", "VeloC checkpointing configurations", false, "sirt_stream.cfg", "string");
 
         cmd.add(argReconOutputPath);
         cmd.add(argReconOutputDir);
@@ -93,6 +97,7 @@ class TraceRuntimeConfig {
         cmd.add(argDestPort);
 
         cmd.add(argCkptFreq);
+        cmd.add(argCkptConfig);
 
         cmd.parse(argc, argv);
         kReconOutputPath = argReconOutputPath.getValue();
@@ -110,6 +115,7 @@ class TraceRuntimeConfig {
         pub_freq= argPubFreq.getValue();
 
         ckpt_freq = argCkptFreq.getValue();
+        ckpt_config = argCkptConfig.getValue();
 
         std::cout << "MPI rank:"<< rank << "; MPI size:" << size << std::endl;
         if(rank==0)
@@ -221,13 +227,15 @@ int main(int argc, char **argv)
   h5md.dims[2] = tmetadata.n_rays_per_proj_row;
 
   /* Initiate VeloC */
-  veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), "sirt_stream.cfg");
+  veloc::client_t *veloc_ckpt = veloc::get_client(comm->rank(), config.ckpt_config);
   const char* veloc_ckpt_name = "sirt_stream";
   // veloc_ckpt->register_observer(VELOC_OBSERVE_CKPT_END, ckpt_callback);
   // DataRegionBareBase<float> ckpt_image = recon_image;
   
-  veloc_ckpt->mem_protect(0, veloc::cereal::serializer(recon_image),
-        veloc::cereal::deserializer(recon_image));
+  // veloc_ckpt->mem_protect(0, veloc::cereal::serializer(recon_image),
+  //       veloc::cereal::deserializer(recon_image));
+  veloc_ckpt->mem_protect(0, veloc::boost::serializer(recon_image),
+        veloc::boost::deserializer(recon_image));
 
   int curr_ckpt_ver = veloc_ckpt->restart_test(veloc_ckpt_name, 0);
   if (curr_ckpt_ver > 0) {

@@ -44,17 +44,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    /* Initiate MPI Communication */
-    MPI_Init(&argc, &argv);
-    int id;
-    MPI_Comm_rank(MPI_COMM_WORLD, &id);
-    int num_workers;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
-    const unsigned int mpi_root = 0;
-
-    if (id == mpi_root) {
-        std::cout << "argc: " << argc << std::endl;
-    }
+    std::cout << "argc: " << argc << std::endl;
 
     const char* filename = argv[1];
     float center = atof(argv[2]);
@@ -62,6 +52,8 @@ int main(int argc, char* argv[])
     int num_iter = atoi(argv[4]);
     // const char* check_point_path = (argc == 6) ? argv[5] : nullptr;
     const char* check_point_config = (argc == 6) ? argv[5] : "art_simple.cfg";
+
+    std::cout << "Reading data..." << std::endl;
 
     // Open tomo_00058_all_subsampled1p_ HDF5 file
     //const char* filename = "../../data/tomo_00058_all_subsampled1p_s1079s1081.h5";
@@ -109,17 +101,33 @@ int main(int argc, char* argv[])
     H5Fclose(file_id);
 
     // reconstruct using art
-    int dt = dims[0];
-    int dy = dims[1];
-    int dx = dims[2];
-    int ngridx = dx;
-    int ngridy = dx;
+    hsize_t dt = dims[0];
+    hsize_t dy = dims[1];
+    hsize_t dx = dims[2];
+    hsize_t ngridx = dx;
+    hsize_t ngridy = dx;
     //int num_iter = 2;
     //int num_outer_iter = 5;
     //float center = 294.078;
 
+    // swap axis in data dt dy
+    float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
+
+    std::cout << "Completed reading the data, starting the reconstruction..." << std::endl;
+    std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
+
     const unsigned int recon_size = dy*ngridx*ngridy;
     float *recon = new float[recon_size];
+
+    /* Initiate MPI Communication */
+    MPI_Init(&argc, &argv);
+    int id;
+    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+    int num_workers;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
+    const unsigned int mpi_root = 0;
+    // int id = 0;
+    // int num_workers = 1;
 
     /* Calculating the working area based on worker id */
     int rows_per_worker = dy / num_workers;
@@ -128,16 +136,18 @@ int main(int argc, char* argv[])
     if (extra_rows != 0 && id < extra_rows) {
         rows_per_worker++;
     }
-    int w_dt = dt;
-    int w_dy = rows_per_worker;
-    int w_dx = dx;
-    int w_ngridx = ngridx;
-    int w_ngridy = ngridy;
-
-    float * w_recon = recon + w_offset*ngridx*ngridy;
+    hsize_t w_dt = dt;
+    hsize_t w_dy = rows_per_worker;
+    hsize_t w_dx = dx;
+    hsize_t w_ngridx = ngridx;
+    hsize_t w_ngridy = ngridy;
+    
     const unsigned int w_recon_size = rows_per_worker*ngridx*ngridy;
+    // float * w_recon = recon + w_offset*ngridx*ngridy;
+    float * w_recon = new float [w_recon_size];
+    float * w_data = data_swap + w_offset*dt*dx;
 
-    std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
+    std::cout << "[task-" << id << "]: offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // Initiate VeloC
     veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
@@ -147,61 +157,66 @@ int main(int argc, char* argv[])
 
     int v = ckpt->restart_test(ckpt_name, 0);
     if (v > 0) {
-        std::cout << "Found a checkpoint version " << v << " at iteration #" << v-1 << ", initiating restart" << std::endl;
+        std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << ", initiating restart" << std::endl;
         if (!ckpt->restart(ckpt_name, v)) {
             throw std::runtime_error("restart failed");
         }
     }else {
         v = 0;
     }
-    std::cout << "Start the reconstruction from iteration #" << v << std::endl;
-
-    std::cout << "ID: " << id << ", offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
-
-    // swap axis in data dt dy
-    float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
+    std::cout << "[task-" << id << "]: Start the reconstruction from iteration #" << v << std::endl;
 
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
     {
-        std::cout << "Outer iteration: " << i << std::endl;
-        art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+        // std::cout << "Outer iteration: " << i << std::endl;
+        // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+        art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
         // Checkpointing
-        if (!ckpt->checkpoint(ckpt_name, v+i+1)) {
+        std::cout << "[task-" << id << "]: Checkpointing for version " << i+1 << std::endl;
+        if (!ckpt->checkpoint(ckpt_name, i+1)) {
             throw std::runtime_error("Checkpointing failured");
         }
-        std::cout << "Checkpointed version " << v+i+1 << std::endl;
+        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
     }
 
-    // Collect reconstructed data from workers
+    if (id == mpi_root) {
+        std::cout << "reconstructed data from workers" << std::endl;
+    }
     MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
 
-    // write the reconstructed data to a file
-    // Create the output file name
-    std::ostringstream oss;
-    // if (check_point_path != nullptr) {
-    //     oss << "cont_recon_" << i << ".h5";
-    // } else {
-    //     oss << "recon_" << i << ".h5";
-    // }
-    oss << "recon.h5";
+    const char * img_name = "recon.h5";
+    if (id == mpi_root) {
+        std::cout << "Save the reconstruction image as " << img_name << std::endl;
 
-    std::string output_filename = oss.str();
-    const char* output_filename_cstr = output_filename.c_str();
+        // write the reconstructed data to a file
+        // Create the output file name
+        std::ostringstream oss;
+        // if (check_point_path != nullptr) {
+        //     oss << "cont_recon_" << i << ".h5";
+        // } else {
+        //     oss << "recon_" << i << ".h5";
+        // }
+        oss << img_name;
 
-    hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    if (output_file_id < 0) {
-        std::cerr << "Error: Unable to create file " << output_filename << std::endl;
-        return 1;
+        std::string output_filename = oss.str();
+        const char* output_filename_cstr = output_filename.c_str();
+
+        hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+        if (output_file_id < 0) {
+            std::cerr << "Error: Unable to create file " << output_filename << std::endl;
+            return 1;
+        }
+        hsize_t output_dims[3] = {dy, ngridy, ngridx};
+        hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+        hid_t output_dataset_id = H5Dcreate(output_file_id, "/recon", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+        H5Dclose(output_dataset_id);
+        H5Sclose(output_dataspace_id);
+        H5Fclose(output_file_id);
+
     }
-    hsize_t output_dims[3] = {dy, ngridy, ngridx};
-    hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-    hid_t output_dataset_id = H5Dcreate(output_file_id, "/recon", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-    H5Dclose(output_dataset_id);
-    H5Sclose(output_dataspace_id);
-    H5Fclose(output_file_id);
 
 
     // free the memory
@@ -209,6 +224,7 @@ int main(int argc, char* argv[])
     delete[] data_swap;
     delete[] theta;
     delete[] recon;
+    delete[] w_recon;
 
     MPI_Finalize();
 
