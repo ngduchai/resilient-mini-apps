@@ -66,19 +66,10 @@ From: continuumio/miniconda3
     git fetch origin
     git checkout master
 
-    # Setup directory structure
-    mkdir -p /aps-mini-apps/build/python
-
-    # Setup flatbuffers data structures
-    cd /aps-mini-apps/include/tracelib
-    flatc -c trace_prot.fbs
-    cd /aps-mini-apps
-
-    # Build SIRT
-    cd /aps-mini-apps/build
-    cmake ..
-    make
-    cd /aps-mini-apps/build/bin
+    # Build ART_SIMPLE
+    cd /aps-mini-apps/src/art_simple
+    ./build.sh
+    cd build
     
     # Setup VeloC
     mkdir tmp
