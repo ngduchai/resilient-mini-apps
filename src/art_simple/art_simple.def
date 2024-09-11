@@ -72,8 +72,7 @@ From: continuumio/miniconda3
     cd build
     
     # Setup VeloC
-    mkdir tmp
-    cp ../../src/sirt_stream.cfg .
+    cp ../sirt_stream.cfg .
 
 
 
