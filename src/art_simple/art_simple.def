@@ -72,7 +72,7 @@ From: continuumio/miniconda3
     cd build
     
     # Setup VeloC
-    cp ../sirt_stream.cfg .
+    cp ../art_simple.cfg .
 
 
 
