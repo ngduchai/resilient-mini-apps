@@ -6,7 +6,10 @@
 
 #include "veloc.hpp"
 
-#include "mpi.h"
+#include <mpi.h>
+
+#include <unistd.h>
+#include <limits.h>
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
@@ -126,8 +129,10 @@ int main(int argc, char* argv[])
     int num_workers;
     MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
     const unsigned int mpi_root = 0;
-    // int id = 0;
-    // int num_workers = 1;
+    
+    char hostname[HOST_NAME_MAX];
+    gethostname(hostname, HOST_NAME_MAX);
+    std::cout << "Task ID " << id << " from " << hostname << std::endl; 
 
     /* Calculating the working area based on worker id */
     int rows_per_worker = dy / num_workers;
@@ -150,7 +155,7 @@ int main(int argc, char* argv[])
     std::cout << "[task-" << id << "]: offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
     // Initiate VeloC
-    veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
+    veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
 
     ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
     const char* ckpt_name = "art_simple";
