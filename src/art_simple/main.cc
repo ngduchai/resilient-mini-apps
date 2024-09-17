@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 #include "art_simple.h"
 #include "hdf5.h"
 
@@ -65,7 +66,7 @@ int main(int argc, char* argv[])
     if (file_id < 0) {
         std::cerr << "Error: Unable to open file " << filename << std::endl;
         return 1;
-    }:q
+    }
 
     // Read the data from the HDF5 file
     const char* dataset_name = "exchange/data";
@@ -229,8 +230,6 @@ int main(int argc, char* argv[])
             H5Fclose(output_file_id);
             std::cout << "Saved a temporary reconstructed image as" << oss.str() << std::endl;
         }
-
-    }
 
     }
 
