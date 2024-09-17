@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
     {
-        // std::cout << "Outer iteration: " << i << std::endl;
+        std::cout << "Outer iteration: " << i << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
