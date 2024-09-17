@@ -55,7 +55,6 @@ int main(int argc, char* argv[])
     int num_iter = atoi(argv[4]);
     int beg_index = atoi(argv[5]);
     int nslices = atoi(argv[6]);
-    const char* check_point_path = (argc == 8) ? argv[7] : nullptr;
     const char* check_point_config = (argc == 8) ? argv[7] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
