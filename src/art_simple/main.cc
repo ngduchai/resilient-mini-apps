@@ -40,6 +40,20 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     return transposed;
 }
 
+int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
+    hid_t output_file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (output_file_id < 0) {
+        return 1;
+    }
+    hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+    hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+    H5Dclose(output_dataset_id);
+    H5Sclose(output_dataspace_id);
+    H5Fclose(output_file_id);
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -212,23 +226,17 @@ int main(int argc, char* argv[])
             
             std::ostringstream oss;
             oss << "recon_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
-            std::cout << "Saving a temporary reconstructed image as" << oss.str() << std::endl;
             std::string output_filename = oss.str();
             const char* output_filename_cstr = output_filename.c_str();
+            hsize_t output_dims[3] = {dy, ngridy, ngridx};
 
-            hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-            if (output_file_id < 0) {
+            if (saveAsHDF5(output_filename_cstr, recon, output_dims) != 0) {
                 std::cerr << "Error: Unable to create file " << output_filename << std::endl;
                 return 1;
             }
-            hsize_t output_dims[3] = {dy, ngridy, ngridx};
-            hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-            hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-            H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-            H5Dclose(output_dataset_id);
-            H5Sclose(output_dataspace_id);
-            H5Fclose(output_file_id);
-            std::cout << "Saved a temporary reconstructed image as" << oss.str() << std::endl;
+            else{
+                std::cout << "Saved a temporary reconstructed image as" << output_filename << std::endl;
+            }
         }
 
     }
@@ -251,22 +259,17 @@ int main(int argc, char* argv[])
         //     oss << "recon_" << i << ".h5";
         // }
         oss << img_name;
-
         std::string output_filename = oss.str();
         const char* output_filename_cstr = output_filename.c_str();
 
-        hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-        if (output_file_id < 0) {
+        hsize_t output_dims[3] = {dy, ngridy, ngridx};
+        if (saveAsHDF5(output_filename_cstr, recon, output_dims) != 0) {
             std::cerr << "Error: Unable to create file " << output_filename << std::endl;
             return 1;
         }
-        hsize_t output_dims[3] = {dy, ngridy, ngridx};
-        hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-        hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-        H5Dclose(output_dataset_id);
-        H5Sclose(output_dataspace_id);
-        H5Fclose(output_file_id);
+        else{
+            std::cout << "Saved a temporary reconstructed image as" << output_filename << std::endl;
+        }
 
     }
 
