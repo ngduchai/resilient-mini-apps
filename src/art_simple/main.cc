@@ -42,8 +42,8 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
 int main(int argc, char* argv[])
 {
 
-    if (argc != 6) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> [veloc config]" << std::endl;
+    if(argc != 8) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> [veloc config]" << std::endl;
         return 1;
     }
 
@@ -53,8 +53,10 @@ int main(int argc, char* argv[])
     float center = atof(argv[2]);
     int num_outer_iter = atoi(argv[3]);
     int num_iter = atoi(argv[4]);
-    // const char* check_point_path = (argc == 6) ? argv[5] : nullptr;
-    const char* check_point_config = (argc == 6) ? argv[5] : "art_simple.cfg";
+    int beg_index = atoi(argv[5]);
+    int nslices = atoi(argv[6]);
+    const char* check_point_path = (argc == 8) ? argv[7] : nullptr;
+    const char* check_point_config = (argc == 8) ? argv[7] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
 
@@ -73,15 +75,34 @@ int main(int argc, char* argv[])
         std::cerr << "Error: Unable to open dataset " << dataset_name << std::endl;
         return 1;
     }
-    // read the data
+
+    //// read the data
     hid_t dataspace_id = H5Dget_space(dataset_id);
     hsize_t dims[3];
     H5Sget_simple_extent_dims(dataspace_id, dims, NULL);
     std::cout << "Data dimensions: " << dims[0] << " x " << dims[1] << " x " << dims[2] << std::endl;
-    float* data = new float[dims[0]*dims[1]*dims[2]];
-    H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+    //float* data = new float[dims[0]*dims[1]*dims[2]];
+    //H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+
+    // read slices from the dataset
+    std::cout << "Target dimensions: " << dims[0] << " x [" << beg_index << "-" << beg_index+nslices << "] x " << dims[2] << std::endl;
+    hsize_t start[3] = {0, beg_index, 0};
+    hsize_t count[3] = {dims[0], nslices, dims[2]};
+    H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, start, NULL, count, NULL);
+
+    // Create a memory dataspace
+    hsize_t mem_dims[3] = {dims[0], nslices, dims[2]};
+    hid_t memspace_id = H5Screate_simple(3, mem_dims, NULL);
+
+    // Allocate memory for the hyperslab
+    float* data = new float[dims[0] * nslices * dims[2]];
+
+    // Read the data from the hyperslab
+    H5Dread(dataset_id, H5T_NATIVE_FLOAT, memspace_id, dataspace_id, H5P_DEFAULT, data);
+
     //close the dataset
     H5Dclose(dataset_id);
+    H5Sclose(memspace_id);
 
     // read the theta
     const char* theta_name = "exchange/theta";
@@ -104,11 +125,11 @@ int main(int argc, char* argv[])
     H5Fclose(file_id);
 
     // reconstruct using art
-    hsize_t dt = dims[0];
-    hsize_t dy = dims[1];
-    hsize_t dx = dims[2];
-    hsize_t ngridx = dx;
-    hsize_t ngridy = dx;
+    int dt = dims[0];
+    int dy = nslices; //dims[1];
+    int dx = dims[2];
+    int ngridx = dx;
+    int ngridy = dx;
     //int num_iter = 2;
     //int num_outer_iter = 5;
     //float center = 294.078;
