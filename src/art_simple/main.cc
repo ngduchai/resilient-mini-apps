@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
     if (file_id < 0) {
         std::cerr << "Error: Unable to open file " << filename << std::endl;
         return 1;
-    }
+    }:q
 
     // Read the data from the HDF5 file
     const char* dataset_name = "exchange/data";
@@ -205,6 +205,34 @@ int main(int argc, char* argv[])
             throw std::runtime_error("Checkpointing failured");
         }
         std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
+
+        // Also push the result to disk for further quality analysis
+        MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+        if (id == mpi_root) {
+            
+            std::ostringstream oss;
+            oss << "recon_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
+            std::cout << "Saving a temporary reconstructed image as" << oss.str() << std::endl;
+            std::string output_filename = oss.str();
+            const char* output_filename_cstr = output_filename.c_str();
+
+            hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+            if (output_file_id < 0) {
+                std::cerr << "Error: Unable to create file " << output_filename << std::endl;
+                return 1;
+            }
+            hsize_t output_dims[3] = {dy, ngridy, ngridx};
+            hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+            hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+            H5Dclose(output_dataset_id);
+            H5Sclose(output_dataspace_id);
+            H5Fclose(output_file_id);
+            std::cout << "Saved a temporary reconstructed image as" << oss.str() << std::endl;
+        }
+
+    }
+
     }
 
     if (id == mpi_root) {
