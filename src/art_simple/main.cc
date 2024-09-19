@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
                 return 1;
             }
             else{
-                std::cout << "Saved a temporary reconstructed image as" << output_filename << std::endl;
+                std::cout << "Saved a temporary reconstructed image as " << output_filename << std::endl;
             }
         }
 
