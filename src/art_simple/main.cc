@@ -192,7 +192,8 @@ int main(int argc, char* argv[])
     // Initiate VeloC
     veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
 
-    ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
+    // ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
+    ckpt->mem_protect(0, recon, sizeof(float), recon_size);
     const char* ckpt_name = "art_simple";
 
     int v = ckpt->restart_test(ckpt_name, 0);
@@ -200,6 +201,10 @@ int main(int argc, char* argv[])
         std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << ", initiating restart" << std::endl;
         if (!ckpt->restart(ckpt_name, v)) {
             throw std::runtime_error("restart failed");
+        }
+        // Copy data from the shared workspace to local workspace
+        for (int i = 0; i < w_recon_size; ++i) {
+            w_recon[i] = recon[i + w_offset*ngridx*ngridy];
         }
     }else {
         v = 0;
@@ -209,19 +214,13 @@ int main(int argc, char* argv[])
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
     {
-        std::cout << "Outer iteration: " << i << std::endl;
+        std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
-        // Checkpointing
-        std::cout << "[task-" << id << "]: Checkpointing for version " << i+1 << std::endl;
-        if (!ckpt->checkpoint(ckpt_name, i+1)) {
-            throw std::runtime_error("Checkpointing failured");
-        }
-        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
-
         // Also push the result to disk for further quality analysis
-        MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+        // MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+        MPI_Allgather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, MPI_COMM_WORLD);
         if (id == mpi_root) {
             
             std::ostringstream oss;
@@ -239,17 +238,21 @@ int main(int argc, char* argv[])
             }
         }
 
+        // Checkpointing
+        if (!ckpt->checkpoint(ckpt_name, i+1)) {
+            throw std::runtime_error("Checkpointing failured");
+        }
+        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
+
     }
 
     if (id == mpi_root) {
-        std::cout << "reconstructed data from workers" << std::endl;
+        std::cout << "Reconstructed data from workers" << std::endl;
     }
     MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
 
     const char * img_name = "recon.h5";
     if (id == mpi_root) {
-        std::cout << "Save the reconstruction image as " << img_name << std::endl;
-
         // write the reconstructed data to a file
         // Create the output file name
         std::ostringstream oss;
@@ -268,7 +271,7 @@ int main(int argc, char* argv[])
             return 1;
         }
         else{
-            std::cout << "Saved a temporary reconstructed image as" << output_filename << std::endl;
+            std::cout << "Save the reconstruction image as " << img_name << std::endl;
         }
 
     }
