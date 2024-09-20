@@ -199,16 +199,38 @@ int main(int argc, char* argv[])
     int v = ckpt->restart_test(ckpt_name, 0);
     if (v > 0) {
         std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << ", initiating restart" << std::endl;
-        if (!ckpt->restart(ckpt_name, v)) {
-            throw std::runtime_error("restart failed");
-        }
-        // Copy data from the shared workspace to local workspace
-        for (int i = 0; i < w_recon_size; ++i) {
-            w_recon[i] = recon[i + w_offset*ngridx*ngridy];
-        }
     }else {
         v = 0;
     }
+
+    // Determine the latest checkpoint
+    int latest_v = 0;
+    MPI_Allreduce(&v, &latest_v, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+    // Determine who is responsible to read the checkpoint and redistribute it to others
+    // This is needed if more than 1 worker finds the latest checkpoint.
+    int dist_id = -1;
+    if (latest_v == v) {
+        dist_id = id;
+    }
+    MPI_Allreduce(&dist_id, &dist_id, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+    if (latest_v > 0) {
+        // Read the checkpoint
+        if (dist_id == id) {
+            if (!ckpt->restart(ckpt_name, v)) {
+                throw std::runtime_error("restart failed");
+            }
+        }
+        // Distribute the checkpoint to others
+        MPI_Scatter(recon, w_recon_size, MPI_FLOAT, w_recon, w_recon_size, MPI_FLOAT, dist_id, MPI_COMM_WORLD);
+        v = latest_v;
+    }
+    // // Copy data from the shared workspace to local workspace
+    // for (int i = 0; i < w_recon_size; ++i) {
+    //     w_recon[i] = recon[i + w_offset*ngridx*ngridy];
+    // }
+
     std::cout << "[task-" << id << "]: Start the reconstruction from iteration #" << v << std::endl;
 
     // run the reconstruction
