@@ -224,10 +224,10 @@ int main(int argc, char* argv[])
             if (!ckpt->restart(ckpt_name, v)) {
                 throw std::runtime_error("restart failed");
             }
+            std::cout << "[task-" << id << "]: Distributed the reconstruction to other tasks" << std::endl;
         }
         // Distribute the checkpoint to others
         MPI_Scatter(recon, w_recon_size, MPI_FLOAT, w_recon, w_recon_size, MPI_FLOAT, dist_id, MPI_COMM_WORLD);
-        std::cout << "[task-" << id << "]: Distributed the reconstruction to other tasks" << std::endl;
     }
     v = latest_v;
     // // Copy data from the shared workspace to local workspace
