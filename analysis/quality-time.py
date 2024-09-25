@@ -4,6 +4,8 @@ import h5py as h5
 import numpy as np
 import sys
 
+import pickle
+
 import matplotlib.pyplot as plt
 
 import os
@@ -48,13 +50,13 @@ def plot_quality(data, name, figpath):
   plt.savefig(figpath)
 
 if __name__ == "__main__":
-  if len(sys.argv) < 3:
-    print("Usage: python quality-time.py <recon folder> <image folder> <num files>")
+  if len(sys.argv) < 5:
+    print("Usage: python quality-time.py <recon folder> <data folder> <max. num files>")
     sys.exit(1)
 
   fdir = sys.argv[1]
-  figpath = "figures/"
-  figpath = sys.argv[2]
+  datapath = "figures/"
+  datapath = sys.argv[2]
   numfiles = 20
   if len(sys.argv) >= 4:
     numfiles = int(sys.argv[3])
@@ -85,11 +87,12 @@ if __name__ == "__main__":
     print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
 
-  plot_quality(msssims, "MS-SSIM", figpath + "msssim")
-  plot_quality(ssims, "SSIM", figpath + "ssim")
-  plot_quality(uqis, "UQI", figpath + "uqi")
-  plot_quality(mses, "MSE", figpath + "mse")
-  plot_quality(psnrs, "PSNR", figpath + "psnr")
+with open(figpath, "w") as f:
+  pickle.dump(msssims, f)
+  pickle.dump(ssims, f)
+  pickle.dump(uqis, f)
+  pickle.dump(mses, f)
+  pickle.dump(psnrs, f)
 
 
 
