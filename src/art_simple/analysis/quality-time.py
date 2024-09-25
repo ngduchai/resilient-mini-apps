@@ -70,13 +70,13 @@ if __name__ == "__main__":
   psnrs = []
 
   for file in files:
-    print("checking quality for", file)
     msssim, ssim, uqi, mse, psnr = iqcheck(fbase, file)
     msssims.append(msssim)
     ssims.append(ssim)
     uqis.append(uqi)
     mses.append(mse)
     psnrs.append(psnr)
+    print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
 
   figpath = "figures/"
