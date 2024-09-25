@@ -48,12 +48,15 @@ def plot_quality(data, name, figpath):
   plt.savefig(figpath)
 
 if __name__ == "__main__":
-  if len(sys.argv) != 2:
-    print("Usage: python quality-time.py <recon folder>")
+  if len(sys.argv) != 3:
+    print("Usage: python quality-time.py <recon folder> <image folder>")
     sys.exit(1)
 
-  # Collect recon files
   fdir = sys.argv[1]
+  figpath = "figures/"
+  figpath = sys.argv[2]
+
+  # Collect recon files
   files = []
   for file in os.listdir(fdir):
     if file.endswith(".h5"):
@@ -79,7 +82,6 @@ if __name__ == "__main__":
     print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
 
-  figpath = "figures/"
   plot_quality(msssims, "MS-SSIM", figpath + "msssim")
   plot_quality(ssims, "SSIM", figpath + "ssim")
   plot_quality(uqis, "UQI", figpath + "uqi")
