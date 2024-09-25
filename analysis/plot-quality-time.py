@@ -16,7 +16,8 @@ def plot_quality(data, colors, name, figpath):
     plt.plot(data[inner], color=colors[inner], label=inner)
   plt.xlabel("# outer iterations")
   plt.ylabel(name)
-
+  
+  plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath)
 
@@ -38,11 +39,11 @@ inners_colors = {
 if __name__ == "__main__":
   
   if len(sys.argv) < 3:
-    print("Usage: python plt-quality-time.py <recon folder> <fig folder>")
+    print("Usage: python plt-quality-time.py <data folder> <fig folder>")
     sys.exit(1)
 
 
-  reconpath = sys.argv[1]
+  datapath = sys.argv[1]
   figpath = sys.argv[2]
 
   msssims = {}
@@ -52,7 +53,7 @@ if __name__ == "__main__":
   psnrs = {}
 
   for inner in inner_configures:
-    with open(figpath, "w") as f:
+    with open(datapath + "/" + inner_data_paths[inner], "rb") as f:
       msssims[inner] = pickle.load(f)
       ssims[inner] = pickle.load(f)
       uqis[inner] = pickle.load(f)

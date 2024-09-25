@@ -50,7 +50,7 @@ def plot_quality(data, name, figpath):
   plt.savefig(figpath)
 
 if __name__ == "__main__":
-  if len(sys.argv) < 5:
+  if len(sys.argv) < 4:
     print("Usage: python quality-time.py <recon folder> <data folder> <max. num files>")
     sys.exit(1)
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
 
-with open(figpath, "w") as f:
+with open(datapath, "wb") as f:
   pickle.dump(msssims, f)
   pickle.dump(ssims, f)
   pickle.dump(uqis, f)
