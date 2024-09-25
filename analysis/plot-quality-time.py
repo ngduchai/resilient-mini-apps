@@ -15,8 +15,8 @@ def plot_quality(steps, data, colors, name, unit, figpath, numiter):
   for inner in data:
     plt.plot(steps[inner], data[inner], color=colors[inner], label=inner)
   plt.xlabel(unit)
+  plt.xlim(0, numiter)
   plt.ylabel(name)
-  plt.ylim(0, numiter)
   
   plt.legend(loc="best")
   plt.tight_layout()
@@ -49,13 +49,13 @@ metric_paths = {
 if __name__ == "__main__":
   
   if len(sys.argv) < 4:
-    print("Usage: python plt-quality-time.py <data folder> <fig folder> < num iter>")
+    print("Usage: python plt-quality-time.py <data folder> <fig folder> <num iter>")
     sys.exit(1)
 
 
   datapath = sys.argv[1]
   figpath = sys.argv[2]
-  numiter = sys.argv[3]
+  numiter = int(sys.argv[3])
 
   metric_data = {}
   for metric in metrics:

@@ -50,7 +50,7 @@ def plot_quality(data, name, figpath):
   plt.savefig(figpath)
 
 if __name__ == "__main__":
-  if len(sys.argv) < 4:
+  if len(sys.argv) < 3:
     print("Usage: python quality-time.py <recon folder> <data folder> <max. num files>")
     sys.exit(1)
 
