@@ -51,7 +51,7 @@ def plot_quality(data, name, figpath):
 
 if __name__ == "__main__":
   if len(sys.argv) < 3:
-    print("Usage: python quality-time.py <recon folder> <data folder> <max. num files>")
+    print("Usage: python quality-iternations.py <recon folder> <data folder> <max. num files>")
     sys.exit(1)
 
   fdir = sys.argv[1]
