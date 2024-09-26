@@ -10,13 +10,22 @@ import matplotlib.pyplot as plt
 
 import os
 
-def plot_quality(steps, data, colors, name, unit, figpath, numiter):
+def plot_quality(steps, data, colors, name, unit, figpath, numiter, data_gd=1):
   plt.figure()
   for inner in data:
-    plt.plot(steps[inner], data[inner], color=colors[inner], label=inner)
+    pdata = np.array(data[inner])
+    if pdata.ndim > 1:
+      # Temporarily collect only one dimension
+      pdata = pdata.transpose()[0]
+    if data_gd == 1:
+      pdata = np.ones(len(pdata))-pdata
+    plt.plot(steps[inner], pdata, color=colors[inner], label=inner)
   plt.xlabel(unit)
   plt.xlim(0, numiter)
+  if data_gd == 1:
+    name = "$1-$" + name
   plt.ylabel(name)
+  plt.yscale("log")
   
   plt.legend(loc="best")
   plt.tight_layout()
@@ -46,6 +55,14 @@ metric_paths = {
   "PSNR": 'psnr'
 }
 
+metric_gd = {
+  "MS-SSIM": 1,
+  "SSIM": 1,
+  "UQI": 1,
+  "MSE": -1,
+  "PSNR": 2
+}
+
 if __name__ == "__main__":
   
   if len(sys.argv) < 4:
@@ -72,8 +89,8 @@ if __name__ == "__main__":
     for inner in inner_configures:
       metric_steps[inner] = np.array(range(len(metric_data[metric][inner])))
       metric_steps_adj[inner] = np.array(range(len(metric_data[metric][inner]))) * inner
-    plot_quality(metric_steps, metric_data[metric], inners_colors, metric, "outer iter.", figpath + "/" + metric_paths[metric], numiter)
-    plot_quality(metric_steps_adj, metric_data[metric], inners_colors, metric, "inner iter.", figpath + "/" + "adj-" + metric_paths[metric], numiter*max(inner_configures))
+    plot_quality(metric_steps, metric_data[metric], inners_colors, metric, "outer iter.", figpath + "/" + metric_paths[metric], numiter, data_gd=metric_gd[metric])
+    plot_quality(metric_steps_adj, metric_data[metric], inners_colors, metric, "inner iter.", figpath + "/" + "adj-" + metric_paths[metric], numiter*max(inner_configures), data_gd=metric_gd[metric])
 
 
 

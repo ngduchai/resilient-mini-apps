@@ -20,9 +20,9 @@ def plot_compute(quality, compute, colors, name, unit, figpath):
   m = 0
   for inner in compute:
     x = np.arange(len(quality[inner]))
-    print(inner)
-    print(quality[inner])
-    print(compute[inner])
+    # print(inner)
+    # print(quality[inner])
+    # print(compute[inner])
     plt.bar(x + width*m, np.array(compute[inner])*inner, width, color=colors[inner], label=inner)
     m += 1
   plt.xlabel(name)
@@ -38,15 +38,13 @@ def cal_improvement(data, data_gd=1):
   pdata = np.array(data)
   if pdata.ndim > 1:
     # Temporarily collect only one dimension
-    pdata = pdata[0]
+    pdata = pdata.transpose()[0]
   if data_gd == 1:
     pdata = np.ones(len(pdata)) - pdata
   quality = 0.1
   m = 0.1
   qualities = []
   computes = []
-
-  print(pdata)
   
   for i in range(len(pdata)):
     if pdata[i] < quality:
