@@ -10,6 +10,31 @@ import matplotlib.pyplot as plt
 
 import os
 
+
+# Making a plot showing how the convergence indicators change when increasing the
+# the number of reconstruction iterations. 
+
+def plot_quality(steps, data, colors, name, unit, figpath, numiter, data_gd=1):
+  plt.figure()
+  for inner in data:
+    pdata = np.array(data[inner])
+    if pdata.ndim > 1:
+      # Temporarily collect only one dimension
+      pdata = pdata.transpose()[0]
+    if data_gd == 1:
+      pdata = np.ones(len(pdata))-pdata
+    plt.plot(steps[inner], pdata, color=colors[inner], label=inner)
+  plt.xlabel(unit)
+  plt.xlim(0, numiter)
+  if data_gd == 1:
+    name = "$1-$" + name
+  plt.ylabel(name)
+  plt.yscale("log")
+  
+  plt.legend(loc="best")
+  plt.tight_layout()
+  plt.savefig(figpath)
+
 def plot_compute(quality, compute, colors, name, unit, figpath):
   plt.figure()
   width = 0.15
@@ -59,7 +84,6 @@ def cal_improvement(data, data_gd=1):
   
   return qualities, computes
 
-
 reconpath = "recons/"
 inner_configures = [1, 2, 4, 8]
 inner_data_paths = {
@@ -89,18 +113,23 @@ metric_gd = {
   "SSIM": 1,
   "UQI": 1,
   "MSE": -1,
-  "PSNR": 1
+  "PSNR": 2
 }
 
 if __name__ == "__main__":
   
-  if len(sys.argv) < 3:
-    print("Usage: python plt-quality-improvement.py <data folder> <fig folder>")
+  if len(sys.argv) < 4:
+    print("Usage: python plt-indicators-time.py <data folder> <fig folder> <num iter>")
     sys.exit(1)
 
 
   datapath = sys.argv[1]
   figpath = sys.argv[2]
+  numiter = int(sys.argv[3])
+  if not os.path.exists(figpath + "/compute"):
+    os.makedirs(figpath + "/compute")
+  if not os.path.exists(figpath + "/quality"):
+    os.makedirs(figpath + "/quality")
 
   metric_data = {}
   quality_data = {}
@@ -116,8 +145,16 @@ if __name__ == "__main__":
         metric_data[metric][inner] = pickle.load(f)
         quality_data[metric][inner], compute_data[metric][inner] = cal_improvement(metric_data[metric][inner], metric_gd[metric])
 
+
   for metric in metrics:
-    plot_compute(quality_data[metric], compute_data[metric], inners_colors, metric, "inner iter.", figpath + "/" + metric_paths[metric])
+    plot_compute(quality_data[metric], compute_data[metric], inners_colors, metric, "inner iter.", figpath + "/compute/" + metric_paths[metric])
+    metric_steps = {}
+    metric_steps_adj = {}
+    for inner in inner_configures:
+      metric_steps[inner] = np.array(range(len(metric_data[metric][inner])))
+      metric_steps_adj[inner] = np.array(range(len(metric_data[metric][inner]))) * inner
+    plot_quality(metric_steps, metric_data[metric], inners_colors, metric, "outer iter.", figpath + "/quality/" + metric_paths[metric], numiter, data_gd=metric_gd[metric])
+    plot_quality(metric_steps_adj, metric_data[metric], inners_colors, metric, "inner iter.", figpath + "/quality/" + "adj-" + metric_paths[metric], numiter*max(inner_configures), data_gd=metric_gd[metric])
 
 
 
