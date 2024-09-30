@@ -50,16 +50,17 @@ def plot_quality(data, name, figpath):
   plt.savefig(figpath)
 
 if __name__ == "__main__":
-  if len(sys.argv) < 3:
-    print("Usage: python quality-iternations.py <recon folder> <data folder> <max. num files>")
+  if len(sys.argv) < 4:
+    print("Usage: python quality-iternations.py <recon folder> <data folder> <max. num files> <ground truth>")
     sys.exit(1)
 
-  fdir = sys.argv[1]
+  ground_truth = sys.argv[1]
+  fdir = sys.argv[2]
   datapath = "figures/"
-  datapath = sys.argv[2]
+  datapath = sys.argv[3]
   numfiles = 20
-  if len(sys.argv) >= 4:
-    numfiles = int(sys.argv[3])
+  if len(sys.argv) >= 5:
+    numfiles = int(sys.argv[4])
 
   # Collect recon files
   files = []
@@ -77,6 +78,12 @@ if __name__ == "__main__":
   mses = []
   psnrs = []
 
+  gt_msssims = []
+  gt_ssims = []
+  gt_uqis = []
+  gt_mses = []
+  gt_psnrs = []
+
   for file in files:
     msssim, ssim, uqi, mse, psnr = iqcheck(fbase, file)
     msssims.append(msssim)
@@ -84,8 +91,16 @@ if __name__ == "__main__":
     uqis.append(uqi)
     mses.append(mse)
     psnrs.append(psnr)
-    print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
+    print("checking convergence indications for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
+
+    msssim, ssim, uqi, mse, psnr = iqcheck(ground_truth, file)
+    gt_msssims.append(msssim)
+    gt_ssims.append(ssim)
+    gt_uqis.append(uqi)
+    gt_mses.append(mse)
+    gt_psnrs.append(psnr)
+    print("checking convergence indications for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
 
 with open(datapath, "wb") as f:
   pickle.dump(msssims, f)
@@ -93,6 +108,12 @@ with open(datapath, "wb") as f:
   pickle.dump(uqis, f)
   pickle.dump(mses, f)
   pickle.dump(psnrs, f)
+
+  pickle.dump(gt_msssims, f)
+  pickle.dump(gt_ssims, f)
+  pickle.dump(gt_uqis, f)
+  pickle.dump(gt_mses, f)
+  pickle.dump(gt_psnrs, f)
 
 
 

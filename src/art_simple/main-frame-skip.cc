@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
 
     // ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
     ckpt->mem_protect(0, recon, sizeof(float), recon_size);
-    const char* ckpt_name = "art_simple_frame_skipping";
+    const char* ckpt_name = "art_simple_skip_frame";
 
     int v = ckpt->restart_test(ckpt_name, 0);
     if (v > 0) {
@@ -271,7 +271,7 @@ int main(int argc, char* argv[])
         if (id == mpi_root) {
             
             std::ostringstream oss;
-            oss << "recon_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
+            oss << "recon_skip_frame_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
             std::string output_filename = oss.str();
             const char* output_filename_cstr = output_filename.c_str();
             hsize_t output_dims[3] = {dy, ngridy, ngridx};
