@@ -15,6 +15,9 @@ include_directories(${MPI_INCLUDE_PATH})
 
 # Add an executable
 add_executable(art_simple_main main.cc art_simple.cc)
+add_executable(art_simple_skip_frames main-frame-skip.cc art_simple.cc)
 
 # Link the HDF5 library
 target_link_libraries(art_simple_main HDF5::HDF5 veloc-client MPI::MPI_CXX)
+target_link_libraries(art_simple_skip_frames HDF5::HDF5 veloc-client MPI::MPI_CXX)
+
