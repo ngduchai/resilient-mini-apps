@@ -10,40 +10,64 @@ import matplotlib.pyplot as plt
 
 import os
 
-def plot_quality(steps, data, colors, name, unit, figpath, numiter, data_gd=1):
+def plot_data(data, colors, name, unit, figpath, numiter, data_gd=1):
   plt.figure()
-  for inner in data:
-    pdata = np.array(data[inner])
+  for skip_ratio in data:
+    pdata = np.array(data[skip_ratio])
     if pdata.ndim > 1:
       # Temporarily collect only one dimension
       pdata = pdata.transpose()[0]
     if data_gd == 1:
       pdata = np.ones(len(pdata))-pdata
-    plt.plot(steps[inner], pdata, color=colors[inner], label=inner)
+    plt.plot(pdata, color=colors[skip_ratio], label=skip_labels[skip_ratio])
   plt.xlabel(unit)
   plt.xlim(0, numiter)
   if data_gd == 1:
     name = "$1-$" + name
   plt.ylabel(name)
-  plt.yscale("log")
+  # ßßß
   
   plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath)
 
 reconpath = "recons/"
-inner_configures = [1, 2, 4, 8]
-inner_data_paths = {
-  1 : "inner-1",
-  2 : "inner-2",
-  4 : "inner-4",
-  8 : "inner-8"
+# skip_configures = ["0", "10", "50", "90"]
+# skip_configures = ["0", "10", "10-add-every-10", "10-skip-at-50", "50"]
+# skip_configures = ["0", "10", "10-add-every-10", "10-add-every-20", "20-add-every-10", "20-add-every-20", "10-skip-at-50", "50"]
+# skip_configures = ["0", "10", "10-add-every-10", "10-add-every-20", "20-add-every-10", "20-add-every-20", "50"]
+skip_configures = ["0", "10", "10-skip-at-50", "10-add-every-10"]
+skip_data_paths = {
+  "0" : "indicators-00",
+  "10" : "indicators-10",
+  "10-add-every-10" : "indicators-10-add-every-10",
+  "10-add-every-20" : "indicators-10-add-every-20",
+  "20-add-every-10" : "indicators-20-add-every-10",
+  "20-add-every-20" : "indicators-20-add-every-20",
+  "10-skip-at-50" : "indicators-10-drop-at-50",
+  "10-skip-at-100" : "indicators-10-drop-at-100",
+  "50" : "indicators-50",
+  "50-skip-at-100" : "indicators-50-drop-at-100",
+  "90" : "indicators-90"
 }
-inners_colors = {
-  1 : "orange",
-  2 : "blue",
-  4 : "green",
-  8 : "purple"
+skip_labels = {
+  "0" : "Ideal",
+  "10" : "$10\%$ data missed",
+  "10-skip-at-50": "$10\%$ data missed after iter #50",
+  "10-add-every-10" : "$10\%$ data available every 10 iter.",
+}
+skip_colors = {
+  "0" : "orange",
+  "10" : "blue",
+  "10-add-every-10" : "violet",
+  "10-add-every-20" : "olivedrab",
+  "20-add-every-10" : "chocolate",
+  "20-add-every-20" : "salmon",
+  "10-skip-at-50" : "brown",
+  "10-skip-at-100" : "indigo",
+  "50" : "green",
+  "50-skip-at-100" : "yellowgreen",
+  "90" : "purple"
 }
 
 metrics = ["MS-SSIM", "SSIM", "UQI", "MSE", "PSNR"]
@@ -66,31 +90,35 @@ metric_gd = {
 if __name__ == "__main__":
   
   if len(sys.argv) < 4:
-    print("Usage: python plt-quality-time.py <data folder> <fig folder> <num iter>")
+    print("Usage: python plt-quality-indicators.py <data folder> <fig folder> <num iter>")
     sys.exit(1)
 
 
   datapath = sys.argv[1]
   figpath = sys.argv[2]
   numiter = int(sys.argv[3])
+  if not os.path.exists(figpath + "/indicators"):
+    os.makedirs(figpath + "/indicators")
+  if not os.path.exists(figpath + "/quality"):
+    os.makedirs(figpath + "/quality")
 
-  metric_data = {}
+  indicator_data = {}
+  quality_data = {}
   for metric in metrics:
-    metric_data[metric] = {}
+    indicator_data[metric] = {}
+    quality_data[metric] = {}
 
-  for inner in inner_configures:
-    with open(datapath + "/" + inner_data_paths[inner], "rb") as f:
+  for skip_ratio in skip_configures:
+    with open(datapath + "/" + skip_data_paths[skip_ratio], "rb") as f:
       for metric in metrics:
-        metric_data[metric][inner] = pickle.load(f)
+        indicator_data[metric][skip_ratio] = pickle.load(f)
+      for metric in metrics:
+        quality_data[metric][skip_ratio] = pickle.load(f)
+      
 
   for metric in metrics:
-    metric_steps = {}
-    metric_steps_adj = {}
-    for inner in inner_configures:
-      metric_steps[inner] = np.array(range(len(metric_data[metric][inner])))
-      metric_steps_adj[inner] = np.array(range(len(metric_data[metric][inner]))) * inner
-    plot_quality(metric_steps, metric_data[metric], inners_colors, metric, "outer iter.", figpath + "/" + metric_paths[metric], numiter, data_gd=metric_gd[metric])
-    plot_quality(metric_steps_adj, metric_data[metric], inners_colors, metric, "inner iter.", figpath + "/" + "adj-" + metric_paths[metric], numiter*max(inner_configures), data_gd=metric_gd[metric])
+    plot_data(indicator_data[metric], skip_colors, metric, "# iterations", figpath + "/indicators/" + metric_paths[metric], numiter, data_gd=metric_gd[metric])
+    plot_data(quality_data[metric], skip_colors, metric, "# iterations", figpath + "/quality/" + metric_paths[metric], numiter, data_gd=metric_gd[metric])
 
 
 

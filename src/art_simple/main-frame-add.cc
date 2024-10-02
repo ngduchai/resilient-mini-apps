@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 {
 
     if(argc != 10) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <beginning_skip_iter> <skip_ratio> [veloc config]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <add_ratio> <add_step> [veloc config]" << std::endl;
         return 1;
     }
 
@@ -72,8 +72,8 @@ int main(int argc, char* argv[])
     int num_iter = atoi(argv[4]);
     int beg_index = atoi(argv[5]);
     int nslices = atoi(argv[6]);
-    float skip_ratio = atof(argv[7]);
-    int beginning_skip_iter = atoi(argv[8]);
+    float add_ratio = atof(argv[7]);
+    int add_step = atoi(argv[8]);
     const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
@@ -113,10 +113,10 @@ int main(int argc, char* argv[])
     hid_t memspace_id = H5Screate_simple(3, mem_dims, NULL);
 
     // Allocate memory for the hyperslab
-    float* original_data = new float[dims[0] * nslices * dims[2]];
+    float* data = new float[dims[0] * nslices * dims[2]];
 
     // Read the data from the hyperslab
-    H5Dread(dataset_id, H5T_NATIVE_FLOAT, memspace_id, dataspace_id, H5P_DEFAULT, original_data);
+    H5Dread(dataset_id, H5T_NATIVE_FLOAT, memspace_id, dataspace_id, H5P_DEFAULT, data);
 
     //close the dataset
     H5Dclose(dataset_id);
@@ -152,33 +152,16 @@ int main(int argc, char* argv[])
     //int num_outer_iter = 5;
     //float center = 294.078;
 
-    // Skipping frames
-    // Randomly remove a certain number of frames according to the input ratio.
+    // Initialize frames at add_ratio, then add [add_ratio] more frames
+    // for every [add_step] outer iterations
     
-    int skip_threshold = (int)(skip_ratio * 100);
-    std::srand(std::time(0));
-    std::vector<int> selections;
-    for (int i = 0; i < dt; ++i) {
-        int c = std::rand() % 100;
-        if (c > skip_threshold) {
-            selections.push_back(i);
-        }
-    }
-    float* data = new float[selections.size() * dy * dx];
-    float* original_theta = theta;
-    theta = new float[selections.size() * dy * dx];
-    for (int i = 0; i < selections.size(); ++i) {
-        int select = selections[i];
-        memcpy(data + i*dy*dx, original_data + select*dy*dx, sizeof(float)*dy*dx);
-        theta[i] = original_theta[select];
-    }
+    int add_delta = (int)(add_ratio * dt);
     int original_dt = dt;
-    dt = selections.size();
+    dt = add_delta;
 
 
     // swap axis in data dt dy
     float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
-    float *original_data_swap = swapDimensions(original_data, original_dt, dy, dx, 0, 1);
 
     std::cout << "Completed reading the data, starting the reconstruction..." << std::endl;
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
@@ -216,7 +199,6 @@ int main(int argc, char* argv[])
     // float * w_recon = recon + w_offset*ngridx*ngridy;
     float * w_recon = new float [w_recon_size];
     float * w_data = data_swap + w_offset*dt*dx;
-    float * w_original_data = original_data_swap + w_offset*original_dt*dx;
 
     std::cout << "[task-" << id << "]: offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
@@ -225,7 +207,7 @@ int main(int argc, char* argv[])
 
     // ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
     ckpt->mem_protect(0, recon, sizeof(float), recon_size);
-    const char* ckpt_name = "art_simple_skip_frame";
+    const char* ckpt_name = "art_simple_add_frame";
 
     int v = ckpt->restart_test(ckpt_name, 0);
     if (v > 0) {
@@ -273,12 +255,15 @@ int main(int argc, char* argv[])
     {
         std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
-        if (i <= beginning_skip_iter) {
-            art(w_original_data, w_dy, w_original_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
-        }else{
-            art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+        int expected_dt = (i / add_step+1)*add_delta;
+        if (expected_dt > dt && expected_dt <= original_dt) {
+            delete[] data_swap;
+            dt = expected_dt;
+            data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
+            w_data = data_swap + w_offset*dt*dx;
+            w_dt = dt;
         }
-        // art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+        art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
         // Also push the result to disk for further quality analysis
         // MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
@@ -286,7 +271,7 @@ int main(int argc, char* argv[])
         if (id == mpi_root) {
             
             std::ostringstream oss;
-            oss << "recon_skip_frame_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
+            oss << "recon_add_frame_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
             std::string output_filename = oss.str();
             const char* output_filename_cstr = output_filename.c_str();
             hsize_t output_dims[3] = {dy, ngridy, ngridx};

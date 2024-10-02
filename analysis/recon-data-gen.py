@@ -51,7 +51,7 @@ def plot_quality(data, name, figpath):
 
 if __name__ == "__main__":
   if len(sys.argv) < 4:
-    print("Usage: python quality-iternations.py <recon folder> <data folder> <max. num files> <ground truth>")
+    print("Usage: python recon-data-gen.py <ground truth> <recon folder> <data folder> <max. num files>")
     sys.exit(1)
 
   ground_truth = sys.argv[1]
@@ -94,13 +94,14 @@ if __name__ == "__main__":
     print("checking convergence indications for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
     fbase = file
 
+  for file in files:
     msssim, ssim, uqi, mse, psnr = iqcheck(ground_truth, file)
     gt_msssims.append(msssim)
     gt_ssims.append(ssim)
     gt_uqis.append(uqi)
     gt_mses.append(mse)
     gt_psnrs.append(psnr)
-    print("checking convergence indications for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
+    print("checking quality for", file, "MS-SSIM", msssim, "SSIM", ssim, "UQI", uqi, "MSE", mse, "PSNR", psnr)
 
 with open(datapath, "wb") as f:
   pickle.dump(msssims, f)

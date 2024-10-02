@@ -119,7 +119,7 @@ metric_gd = {
 if __name__ == "__main__":
   
   if len(sys.argv) < 4:
-    print("Usage: python plt-indicators-time.py <data folder> <fig folder> <num iter>")
+    print("Usage: python plot-indicators-iterations.py <data folder> <fig folder> <num iter>")
     sys.exit(1)
 
 
