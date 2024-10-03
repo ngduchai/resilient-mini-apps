@@ -25,49 +25,76 @@ def plot_data(data, colors, name, unit, figpath, numiter, data_gd=1):
   if data_gd == 1:
     name = "$1-$" + name
   plt.ylabel(name)
-  # ßßß
+  plt.yscale("log")
   
   plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath)
 
 reconpath = "recons/"
-# skip_configures = ["0", "10", "50", "90"]
-# skip_configures = ["0", "10", "10-add-every-10", "10-skip-at-50", "50"]
-# skip_configures = ["0", "10", "10-add-every-10", "10-add-every-20", "20-add-every-10", "20-add-every-20", "10-skip-at-50", "50"]
+skip_configures = ["0", "10", "50", "90"]
+# skip_configures = ["0", "10", "10-add-every-10", "10-drop-at-50", "50"]
+# skip_configures = ["0", "10", "10-add-every-10", "10-add-every-20", "20-add-every-10", "20-add-every-20", "10-drop-at-50", "50"]
 # skip_configures = ["0", "10", "10-add-every-10", "10-add-every-20", "20-add-every-10", "20-add-every-20", "50"]
-skip_configures = ["0", "10", "10-skip-at-50", "10-add-every-10"]
+# skip_configures = ["0", "10", "25", "40", "50", "10-drop-at-50", "10-add-every-10"]
+# skip_configures = ["0",
+#   "10", "10-drop-at-50", "10-drop-at-100",
+#   "50", "50-drop-at-50", "50-drop-at-100",
+#   "90", "90-drop-at-50", "90-drop-at-100"
+#   ]
 skip_data_paths = {
   "0" : "indicators-00",
   "10" : "indicators-10",
   "10-add-every-10" : "indicators-10-add-every-10",
   "10-add-every-20" : "indicators-10-add-every-20",
+  "10-drop-at-100" : "indicators-10-drop-at-100",
+  "10-drop-at-50" : "indicators-10-drop-at-50",
   "20-add-every-10" : "indicators-20-add-every-10",
   "20-add-every-20" : "indicators-20-add-every-20",
-  "10-skip-at-50" : "indicators-10-drop-at-50",
-  "10-skip-at-100" : "indicators-10-drop-at-100",
+  "25" : "indicators-25",
+  "25-drop-at-50" : "indicators-25-drop-at-50",
+  "40" : "indicators-40",
   "50" : "indicators-50",
-  "50-skip-at-100" : "indicators-50-drop-at-100",
-  "90" : "indicators-90"
+  "50-drop-at-50" : "indicators-50-drop-at-50",
+  "50-drop-at-100" : "indicators-50-drop-at-100",
+  "90" : "indicators-90",
+  "90-drop-at-50" : "indicators-90-drop-at-50",
+  "90-drop-at-100" : "indicators-90-drop-at-100",
 }
 skip_labels = {
   "0" : "Ideal",
   "10" : "$10\%$ data missed",
-  "10-skip-at-50": "$10\%$ data missed after iter #50",
+  "10-drop-at-50": "$10\%$ data missed after iter #50",
+  "10-drop-at-100": "$10\%$ data missed after iter #100",
   "10-add-every-10" : "$10\%$ data available every 10 iter.",
+  "25" : "$25\%$ data missed",
+  "25-drop-at-50" : "$25\%$ data missed after iter #50",
+  "40" : "$40\%$ data missed",
+  "50" : "$50\%$ data missed",
+  "50-drop-at-50": "$50\%$ data missed after iter #50",
+  "50-drop-at-100": "$50\%$ data missed after iter #100",
+  "90" : "$90\%$ data missed",
+  "90-drop-at-50": "$90\%$ data missed after iter #50",
+  "90-drop-at-100": "$90\%$ data missed after iter #100",
 }
 skip_colors = {
   "0" : "orange",
   "10" : "blue",
+  "10-drop-at-50" : "brown",
+  "10-drop-at-100" : "indigo",
   "10-add-every-10" : "violet",
   "10-add-every-20" : "olivedrab",
   "20-add-every-10" : "chocolate",
   "20-add-every-20" : "salmon",
-  "10-skip-at-50" : "brown",
-  "10-skip-at-100" : "indigo",
+  "25" : "cornflowerblue",
+  "25-drop-at-50" : "pink",
+  "40" : "lightseagreen",
   "50" : "green",
-  "50-skip-at-100" : "yellowgreen",
-  "90" : "purple"
+  "50-drop-at-50" : "cyan",
+  "50-drop-at-100" : "olivedrab",
+  "90" : "purple",
+  "90-drop-at-50" : "greenyellow",
+  "90-drop-at-100" : "yellowgreen",
 }
 
 metrics = ["MS-SSIM", "SSIM", "UQI", "MSE", "PSNR"]

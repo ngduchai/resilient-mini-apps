@@ -152,34 +152,6 @@ int main(int argc, char* argv[])
     //int num_outer_iter = 5;
     //float center = 294.078;
 
-    // Skipping frames
-    // Randomly remove a certain number of frames according to the input ratio.
-    
-    int skip_threshold = (int)(skip_ratio * 100);
-    std::srand(std::time(0));
-    std::vector<int> selections;
-    for (int i = 0; i < dt; ++i) {
-        int c = std::rand() % 100;
-        if (c > skip_threshold) {
-            selections.push_back(i);
-        }
-    }
-    float* data = new float[selections.size() * dy * dx];
-    float* original_theta = theta;
-    theta = new float[selections.size() * dy * dx];
-    for (int i = 0; i < selections.size(); ++i) {
-        int select = selections[i];
-        memcpy(data + i*dy*dx, original_data + select*dy*dx, sizeof(float)*dy*dx);
-        theta[i] = original_theta[select];
-    }
-    int original_dt = dt;
-    dt = selections.size();
-
-
-    // swap axis in data dt dy
-    float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
-    float *original_data_swap = swapDimensions(original_data, original_dt, dy, dx, 0, 1);
-
     std::cout << "Completed reading the data, starting the reconstruction..." << std::endl;
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
@@ -193,6 +165,37 @@ int main(int argc, char* argv[])
     int num_workers;
     MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
     const unsigned int mpi_root = 0;
+
+    // Sync data across tasks
+    int skip_threshold = (int)(skip_ratio * 100);
+    std::srand(std::time(0));
+    std::vector<int> selections;
+    int original_dt = dt;
+    if (id == mpi_root) {
+        // Skipping frames
+        // Randomly remove a certain number of frames according to the input ratio.
+        for (int i = 0; i < dt; ++i) {
+            int c = std::rand() % 100;
+            // int c = i % 100;
+            if (c > skip_threshold) {
+                selections.push_back(i);
+            }
+        }
+        dt = selections.size();
+    }
+    MPI_Bcast(&dt, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+    float* data = new float[dt * dy * dx];
+    float* original_theta = theta;
+    theta = new float[dt];
+    if (id == mpi_root) {
+        for (int i = 0; i < selections.size(); ++i) {
+            int select = selections[i];
+            memcpy(data + i*dy*dx, original_data + select*dy*dx, sizeof(float)*dy*dx);
+            theta[i] = original_theta[select];
+        }
+    }
+    MPI_Bcast(theta, dt, MPI_INT, mpi_root, MPI_COMM_WORLD);
+    MPI_Bcast(data, dt * dy * dx, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
     
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
@@ -211,6 +214,11 @@ int main(int argc, char* argv[])
     hsize_t w_dx = dx;
     hsize_t w_ngridx = ngridx;
     hsize_t w_ngridy = ngridy;
+    float * w_original_theta = original_theta;
+
+    // swap axis in data dt dy
+    float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
+    float *original_data_swap = swapDimensions(original_data, original_dt, dy, dx, 0, 1);
     
     const unsigned int w_recon_size = rows_per_worker*ngridx*ngridy;
     // float * w_recon = recon + w_offset*ngridx*ngridy;
@@ -274,7 +282,7 @@ int main(int argc, char* argv[])
         std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         if (i <= beginning_skip_iter) {
-            art(w_original_data, w_dy, w_original_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+            art(w_original_data, w_dy, w_original_dt, w_dx, &center, w_original_theta, w_recon, w_ngridx, w_ngridy, num_iter);
         }else{
             art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         }
