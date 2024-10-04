@@ -167,8 +167,7 @@ int main(int argc, char* argv[])
     
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
-    std::cout << "Task ID " << id << " from " << hostname << std::endl;
-
+    std::cout << "Task ID " << id << " from " << hostname << std::endl; 
 
     /* Calculating the working area based on worker id */
     int rows_per_worker = dy / num_workers;
@@ -190,30 +189,55 @@ int main(int argc, char* argv[])
 
     std::cout << "[task-" << id << "]: offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
 
-
     // Initiate VeloC
     veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
 
-    // Tracking number of process
-    int ckpt_num_tasks; 
-    ckpt->mem_protect(0, &ckpt_num_tasks, sizeof(int), 1);
-    // Tracking the reconstruction space
-    float * ckpt_recon = new float[recon_size];
-    ckpt->mem_protect(1, ckpt_recon, sizeof(float), recon_size);
+    // ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
+    ckpt->mem_protect(0, recon, sizeof(float), recon_size);
     const char* ckpt_name = "art_simple";
+
+    
 
     int v = ckpt->restart_test(ckpt_name, 0);
     if (v > 0) {
         std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << std::endl;
-        ckpt->restart_begin(ckpt_name, v);
-        ckpt->recover_mem(VELOC_RECOVER_SOME, {0});
-
-        // Determine the memory regions to be recovered
-
-
-        ckpt->restart_end(true);
-
+    }else {
+        v = 0;
     }
+    
+    // Determine the latest checkpoint
+    int latest_v = 0;
+    MPI_Allreduce(&v, &latest_v, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+    if (latest_v > 0) {
+        
+        // Determine who is responsible to read the checkpoint and redistribute it to others
+        // This is needed if more than 1 worker finds the latest checkpoint.
+        int dist_id = -1;
+        int vid = -1;
+        if (latest_v == v) {
+            vid = id;
+        }
+        MPI_Allreduce(&vid, &dist_id, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+        // Read the checkpoint
+        if (dist_id == id) {
+            std::cout << "[task-" << id << "]: Initiate restart from iteration #" << v-1 << std::endl;
+            if (!ckpt->restart(ckpt_name, v)) {
+                throw std::runtime_error("restart failed");
+            }
+            std::cout << "[task-" << id << "]: Distributed the reconstruction to other tasks" << std::endl;
+        }
+        // Distribute the checkpoint to others
+        MPI_Scatter(recon, w_recon_size, MPI_FLOAT, w_recon, w_recon_size, MPI_FLOAT, dist_id, MPI_COMM_WORLD);
+    }
+    v = latest_v;
+    // // Copy data from the shared workspace to local workspace
+    // for (int i = 0; i < w_recon_size; ++i) {
+    //     w_recon[i] = recon[i + w_offset*ngridx*ngridy];
+    // }
+
+    std::cout << "[task-" << id << "]: Start the reconstruction from iteration #" << v << std::endl;
 
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
@@ -223,7 +247,8 @@ int main(int argc, char* argv[])
         art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
 
         // Also push the result to disk for further quality analysis
-        MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+        // MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+        MPI_Allgather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, MPI_COMM_WORLD);
         if (id == mpi_root) {
             
             std::ostringstream oss;
@@ -259,6 +284,11 @@ int main(int argc, char* argv[])
         // write the reconstructed data to a file
         // Create the output file name
         std::ostringstream oss;
+        // if (check_point_path != nullptr) {
+        //     oss << "cont_recon_" << i << ".h5";
+        // } else {
+        //     oss << "recon_" << i << ".h5";
+        // }
         oss << img_name;
         std::string output_filename = oss.str();
         const char* output_filename_cstr = output_filename.c_str();
