@@ -13,6 +13,7 @@
 
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
