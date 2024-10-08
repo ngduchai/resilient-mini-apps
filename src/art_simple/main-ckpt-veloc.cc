@@ -6,6 +6,8 @@
 #include <chrono>
 #include <string.h>
 
+#include <veloc.hpp>
+
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
     float* transposed= new float[x*y*z];
@@ -34,14 +36,30 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     return transposed;
 }
 
+int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
+    hid_t output_file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (output_file_id < 0) {
+        return 1;
+    }
+    hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
+    hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
+    H5Dclose(output_dataset_id);
+    H5Sclose(output_dataspace_id);
+    H5Fclose(output_file_id);
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
     std::cout << "argc: " << argc << std::endl;
 
-    if(argc != 7 && argc != 8) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> [check_point_path]" << std::endl;
+    if(argc != 8) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> [veloc config]" << std::endl;
         return 1;
     }
+
+    std::cout << "argc: " << argc << std::endl;
 
     const char* filename = argv[1];
     float center = atof(argv[2]);
@@ -49,8 +67,7 @@ int main(int argc, char* argv[])
     int num_iter = atoi(argv[4]);
     int beg_index = atoi(argv[5]);
     int nslices = atoi(argv[6]);
-    const char* check_point_path = (argc == 8) ? argv[7] : nullptr;
-
+    const char* check_point_config = (argc == 8) ? argv[7] : "art_simple.cfg";
 
     // Open tomo_00058_all_subsampled1p_ HDF5 file
     //const char* filename = "../../data/tomo_00058_all_subsampled1p_s1079s1081.h5";
@@ -133,31 +150,22 @@ int main(int argc, char* argv[])
     }
     dy = nslices;
 
-    float *recon = new float[dy*ngridx*ngridy];
-
-    if(check_point_path != nullptr) {
-        std::cout << "Check point path: " << check_point_path << std::endl;
-        // read recon data from checkpointing file /recon
-        hid_t check_point_file_id = H5Fopen(check_point_path, H5F_ACC_RDONLY, H5P_DEFAULT);
-        if (check_point_file_id < 0) {
-            std::cerr << "Error: Unable to open file " << check_point_path << std::endl;
-            return 1;
-        }
-        hid_t check_point_dataset_id = H5Dopen(check_point_file_id, "/recon", H5P_DEFAULT);
-        if (check_point_dataset_id < 0) {
-            std::cerr << "Error: Unable to open dataset /recon" << std::endl;
-            return 1;
-        }
-        H5Dread(check_point_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-        H5Dclose(check_point_dataset_id);
-        H5Fclose(check_point_file_id);
-    }
+    const unsigned int recon_size = dy*ngridx*ngridy;
+    float *recon = new float[recon_size];
 
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << 
                  ", ngridx: " << ngridx << ", ngridy: " << ngridy << 
                  ", num_iter: " << num_iter << ", center: " << center << 
                  ", beg_index: " << beg_index <<
                  ", nslices: " << nslices << std::endl;
+
+    // Initiate VeloC
+    unsigned int id = 0;
+    veloc::client_t *ckpt = veloc::get_client(id, check_point_config);
+
+    // ckpt->mem_protect(0, w_recon, sizeof(float), w_recon_size);
+    ckpt->mem_protect(0, recon, sizeof(float), recon_size);
+    const char* ckpt_name = "art_simple";
 
     auto recon_start = std::chrono::high_resolution_clock::now();
 
@@ -167,29 +175,9 @@ int main(int argc, char* argv[])
         std::cout << "Outer iteration: " << i << std::endl;
         art(data_swap, dy, dt, dx, &center, theta, recon, ngridx, ngridy, num_iter);
 
-        // write the reconstructed data to a file
-        // Create the output file name
-        std::ostringstream oss;
-        if (check_point_path != nullptr) {
-            oss << "cont_recon_" << i << ".h5";
-        } else {
-            oss << "recon_" << i << ".h5";
+        if (!ckpt->checkpoint(ckpt_name, i+1)) {
+            throw std::runtime_error("Checkpointing failured");
         }
-        std::string output_filename = oss.str();
-        const char* output_filename_cstr = output_filename.c_str();
-
-        hid_t output_file_id = H5Fcreate(output_filename_cstr, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-        if (output_file_id < 0) {
-            std::cerr << "Error: Unable to create file " << output_filename << std::endl;
-            return 1;
-        }
-        hsize_t output_dims[3] = {dy, ngridy, ngridx};
-        hid_t output_dataspace_id = H5Screate_simple(3, output_dims, NULL);
-        hid_t output_dataset_id = H5Dcreate(output_file_id, "/data", H5T_NATIVE_FLOAT, output_dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-        H5Dwrite(output_dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, recon);
-        H5Dclose(output_dataset_id);
-        H5Sclose(output_dataspace_id);
-        H5Fclose(output_file_id);
     }
 
     auto recon_end = std::chrono::high_resolution_clock::now();
@@ -197,7 +185,27 @@ int main(int argc, char* argv[])
 
     std::cout << "ELAPSED TIME: " << recon_elapsed.count() << " seconds" << std::endl;
 
+    const char * img_name = "recon.h5";
+    // write the reconstructed data to a file
+    // Create the output file name
+    std::ostringstream oss;
+    // if (check_point_path != nullptr) {
+    //     oss << "cont_recon_" << i << ".h5";
+    // } else {
+    //     oss << "recon_" << i << ".h5";
+    // }
+    oss << img_name;
+    std::string output_filename = oss.str();
+    const char* output_filename_cstr = output_filename.c_str();
 
+    hsize_t output_dims[3] = {dy, ngridy, ngridx};
+    if (saveAsHDF5(output_filename_cstr, recon, output_dims) != 0) {
+        std::cerr << "Error: Unable to create file " << output_filename << std::endl;
+        return 1;
+    }
+    else{
+        std::cout << "Save the reconstruction image as " << img_name << std::endl;
+    }
 
     // free the memory
     delete[] data;
