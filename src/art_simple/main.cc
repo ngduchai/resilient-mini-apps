@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
                 removed_nodes.push_back(j);
             }
         }
-
+        
 
     }
 
