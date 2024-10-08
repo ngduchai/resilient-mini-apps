@@ -197,23 +197,48 @@ int main(int argc, char* argv[])
     // Tracking number of process
     int ckpt_num_tasks; 
     ckpt->mem_protect(0, &ckpt_num_tasks, sizeof(int), 1);
+    // Tracking number of rows
+    int ckpt_num_rows;
+    ckpt->mem_protect(1, &ckpt_num_rows, sizeof(int), 1);
     // Tracking the reconstruction space
     float * ckpt_recon = new float[recon_size];
-    ckpt->mem_protect(1, ckpt_recon, sizeof(float), recon_size);
+    ckpt->mem_protect(2, ckpt_recon, sizeof(float), recon_size);
+    // Tracking the row index for each sinogram
+    int * ckpt_row_indexes = new int[dy];
+    ckpt->mem_protect(3, ckpt_row_indexes, sizeof(int), dy);
     const char* ckpt_name = "art_simple";
 
     int v = ckpt->restart_test(ckpt_name, 0);
-    if (v > 0) {
-        std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << std::endl;
-        ckpt->restart_begin(ckpt_name, v);
-        ckpt->recover_mem(VELOC_RECOVER_SOME, {0});
+    // if (v > 0) {
+    //     std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << std::endl;
+    //     ckpt->restart_begin(ckpt_name, v);
+    //     // Read # tasks and # row first
+    //     ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 1});
 
-        // Determine the memory regions to be recovered
+    //     // Adjust the reconstruction area
+    //     ckpt->mem_protect(2, ckpt_recon, sizeof(float), ckpt_num_rows*dx*dt);
+    //     ckpt->mem_protect(3, ckpt_row_indexes, sizeof(int), ckpt_num_rows);
 
+    //     // Recover the data
+    //     ckpt->recover_mem(VELOC_RECOVER_REST, {});
 
-        ckpt->restart_end(true);
+    //     ckpt->restart_end(true);
+    // }
+    // if (ckpt_num_tasks > num_workers) {
+    //     // Number of tasks decrease, so we need to assign more rows to each task
 
+    // }else if (ckpt_num_tasks < num_workers) {
+    //     // Number of tasks increase, so we need to move rows from existing tasks to new ones
+
+    // }
+
+    // tracking active workers
+    int * active_tracker = new int[num_workers];
+    int * prev_active_tracker = new int[num_workers];
+    for (int i = 0; i < num_workers; ++i) {
+        active_tracker[i] = 1;
     }
+    int task_is_active = 1;
 
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
@@ -246,6 +271,20 @@ int main(int argc, char* argv[])
             throw std::runtime_error("Checkpointing failured");
         }
         std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
+
+        // Redistribute data if needed
+        std::swap(active_tracker, prev_active_tracker);
+        MPI_Allgather(&task_is_active, 1, MPI_INT, active_tracker, 1, MPI_INT, MPI_COMM_WORLD);
+        // Check for new and old tasks
+        std::vector<int> added_nodes, removed_nodes;
+        for (int j = 0; j < num_workers; ++j) {
+            if (active_tracker[j] == 1 && prev_active_tracker[j] == 0) {
+                added_nodes.push_back(j);
+            }else if (active_tracker[j] == 0 && prev_active_tracker[j] == 1) {
+                removed_nodes.push_back(j);
+            }
+        }
+
 
     }
 
