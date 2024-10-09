@@ -23,7 +23,7 @@ fix_compute_vary_data() {
 	nslices=$1
 	end_slices=$2
 	while [ $nslices -le $end_slices ]; do
-        	echo "RUN WITH NSLICES = $nslices -------------------------------------------------------------------------------------- "
+        echo "RUN WITH NSLICES = $nslices -------------------------------------------------------------------------------------- "
 		echo "CHPT VELOC ==============================================================================="
 		run_recon 1 $nslices 0 0 0 1
 		echo "CKPT BLOCKING ============================================================================"
@@ -38,15 +38,15 @@ fix_data_vary_compute() {
 	nslices=$1
 	nprocs=1
 	while [ $procs -le $nslices ]; do
-                echo "RUN WITH NPROCS = $nslices / $nslices --------------------------------------------------------------------------- "
-                echo "CHPT VELOC ==============================================================================="
-                run_recon $nprocs $nslices 0 0 0 1
-                echo "CKPT BLOCKING ============================================================================"
-                run_recon $nprocs $nslices 0 0 1 0
-                echo "CKPT NONE ================================================================================"
-                run_recon $nprocs $nslices 0 0 0 0
-                nslices=$((nslices * 2))
-        done
+		echo "RUN WITH NPROCS = $nslices / $nslices --------------------------------------------------------------------------- "
+		echo "CHPT VELOC ==============================================================================="
+		run_recon $nprocs $nslices 0 0 0 1
+		echo "CKPT BLOCKING ============================================================================"
+		run_recon $nprocs $nslices 0 0 1 0
+		echo "CKPT NONE ================================================================================"
+		run_recon $nprocs $nslices 0 0 0 0
+		nslices=$((nslices * 2))
+	done
 }
 
 #fix_compute_vary_data 1 64
