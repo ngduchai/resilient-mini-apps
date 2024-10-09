@@ -239,6 +239,7 @@ int main(int argc, char* argv[])
         active_tracker[i] = 1;
     }
     int task_is_active = 1;
+    int active_tasks = num_workers;
 
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
@@ -277,12 +278,57 @@ int main(int argc, char* argv[])
         MPI_Allgather(&task_is_active, 1, MPI_INT, active_tracker, 1, MPI_INT, MPI_COMM_WORLD);
         // Check for new and old tasks
         std::vector<int> added_nodes, removed_nodes;
+        active_tasks = 0;
+        int task_index = 0;
         for (int j = 0; j < num_workers; ++j) {
             if (active_tracker[j] == 1 && prev_active_tracker[j] == 0) {
                 added_nodes.push_back(j);
             }else if (active_tracker[j] == 0 && prev_active_tracker[j] == 1) {
                 removed_nodes.push_back(j);
             }
+            if (active_tracker[j] == 1) {
+                if (j == id) {
+                    task_index = active_tasks;
+                }
+                active_tasks++;
+            }
+        }
+
+        if (!removed_nodes.empty()) {
+            int recovered_size = 0;
+            float * recovered_recon = nullptr;
+            int * recovered_row_indexes = nullptr;
+            float * local_recovered_recon = nullptr;
+            int * local_recovered_row_indexes = nullptr;
+            if (task_is_active) {
+                int num_ckpt = (removed_nodes.size() / active_tasks);
+                if (removed_nodes.size() % active_tasks > task_index) {
+                    num_ckpt++;
+                }
+
+                recovered_size = num_ckpt; // TODO: Correct with the right size
+
+                local_recovered_recon = new float [recon_size];
+                local_recovered_row_indexes = new int [recon_size];
+
+                for (int j = 0; j < num_ckpt; ++j) {
+                    // TODO: Recover data from checkpoints
+                }
+            }
+            
+            if (id == mpi_root) {
+                recovered_recon = new float [recon_size];
+                recovered_row_indexes = new int [recon_size];
+            }
+
+            // Sync with root
+            MPI_Gather(local_recovered_recon, recovered_size, MPI_FLOAT, recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            MPI_Gather(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_recon, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            // Estimate the data size each task will receive
+            recovered_size = 1;
+            // Reditribute data from root
+            MPI_Scatter(recovered_recon, recovered_size, MPI_FLOAT, local_recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            MPI_Scatter(recovered_row_indexes, recovered_size, MPI_FLOAT, local_recovered_row_indexes, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
         }
         
 

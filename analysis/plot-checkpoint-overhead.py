@@ -42,6 +42,7 @@ if __name__ == "__main__":
   plt.xlabel("# slices")
   plt.xticks(np.arange(len(plotdata[lapp]["overhead"])), list(plotdata[lapp]["overhead"].keys()))
   plt.ylabel("Elapsed time (s)")
+  plt.yscale("log")
   
   plt.legend(loc="best")
   plt.tight_layout()

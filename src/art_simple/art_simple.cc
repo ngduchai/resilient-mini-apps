@@ -407,7 +407,7 @@ art(const float* data, int dy, int dt, int dx, const float* center, const float*
     for(i = 0; i < num_iter; i++)
     {
 
-        std::cout << "Iteration: " << i << std::endl;
+        // std::cout << "Iteration: " << i << std::endl;
 
         // initialize simdata to zero
         memset(simdata, 0, dy * dt * dx * sizeof(float));

@@ -21,6 +21,7 @@ add_executable(art_simple_add_frames main-frame-add.cc art_simple.cc)
 add_executable(art_simple_ckpt_none main-ckpt-none.cc art_simple.cc)
 add_executable(art_simple_ckpt_blocking main-ckpt-blocking.cc art_simple.cc)
 add_executable(art_simple_ckpt_veloc main-ckpt-veloc.cc art_simple.cc)
+add_executable(art_simple_ckpt_quality_analysis main-ckpt-quality-analysis.cc art_simple.cc)
 
 # Link the HDF5 library
 target_link_libraries(art_simple HDF5::HDF5 veloc-client MPI::MPI_CXX)
@@ -30,4 +31,5 @@ target_link_libraries(art_simple_add_frames HDF5::HDF5 veloc-client MPI::MPI_CXX
 target_link_libraries(art_simple_ckpt_none HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_ckpt_blocking HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_ckpt_veloc HDF5::HDF5 veloc-client MPI::MPI_CXX)
+target_link_libraries(art_simple_ckpt_quality_analysis HDF5::HDF5 veloc-client MPI::MPI_CXX)
 
