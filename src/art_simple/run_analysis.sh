@@ -12,11 +12,11 @@ run_recon() {
 	rm -rf /tmp/scratch
 	rm -rf /tmp/persistent
 
-	mpiexec -np $nprocs ./art_simple_ckpt_quality_analysis ../../../data/tooth_preprocessed.h5 294.078 10 1 \
+	mpiexec -np $nprocs ./build/art_simple_ckpt_quality_analysis ../../data/tooth_preprocessed.h5 294.078 10 1 \
 		0 $nslices \
 		$skip_ratio $skip_begin \
 		$write_to_file \
-		$checkpoint ../art_simple.cfg
+		$checkpoint art_simple.cfg
 }
 
 fix_compute_vary_data() {
