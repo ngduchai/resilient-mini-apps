@@ -188,17 +188,21 @@ int main(int argc, char* argv[])
             std::cout << "nslices = " << nslices << " > " << dy << " = dy -- start data duplication" << std::endl; 
         }
         float * data_tmp = data_swap;
+        float * original_data_tmp = original_data_swap;
 
         data_swap = new float [dx*nslices*dt];
+        original_data_swap = new float [dx*nslices*original_dt];
         int additional_slices = nslices - dy;
         int i = 1;
         while (additional_slices > dy) {
             memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*dy);
+            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, dx*original_dt*dy);
             additional_slices -= dy;
             i++;
         }
         if (additional_slices > 0) {
             memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*additional_slices);
+            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, dx*original_dt*additional_slices);
         }
         delete [] data_tmp;
     }

@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         for (int i = 0; i < dt; ++i) {
             int c = std::rand() % 100;
             // int c = i % 100;
-            if (c > skip_threshold) {
+            if (c >= skip_threshold) {
                 selections.push_back(i);
             }
         }
