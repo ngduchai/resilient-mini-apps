@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
     int num_workers;
     MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
     const unsigned int mpi_root = 0;
-    
+
     // Sync data across tasks
     int skip_threshold = (int)(skip_ratio * 100);
     std::srand(std::time(0));
@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
     // run the reconstruction
     for (int i = v; i < num_outer_iter; i++)
     {
-        std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
+        // std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         // art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         if (i <= beginning_skip_iter) {

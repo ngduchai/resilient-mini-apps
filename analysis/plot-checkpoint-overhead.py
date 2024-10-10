@@ -13,7 +13,32 @@ import os
 
 
 # Making a plot showing the checkpoint overhead varying input data size
-
+def plot_time(data, expname, xlab, ylab, figpath):
+  width = 0.15
+  plt.figure()
+  lapp = None
+  for approach in data:
+    if lapp == None or len(data[approach][expname]["total"]) > len(data[lapp][expname]["total"]):
+      lapp = approach
+  m = 0
+  for approach in data:
+    appconf = data[approach]
+    appdata = data[approach][expname]
+    x = np.arange(len(appdata["total"]))
+    overhead = np.array(list(appdata["overhead"].values()))
+    exectime = np.array(list(appdata["total"].values())) - overhead
+    # plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
+    exectime = np.zeros(len(x))
+    plt.bar(x + width*m, overhead, width, bottom=exectime, color=appconf["color"], label=appconf["label"])
+    m += 1
+  plt.xlabel(xlab)
+  plt.xticks(np.arange(len(data[lapp][expname]["total"])), list(data[lapp][expname]["overhead"].keys()))
+  plt.ylabel(ylab)
+  # plt.yscale("log")
+  
+  plt.legend(loc="best")
+  plt.tight_layout()
+  plt.savefig(figpath)
 
 if __name__ == "__main__":
   
@@ -26,28 +51,10 @@ if __name__ == "__main__":
   figpath = sys.argv[2]
   with open(datapath, 'r') as file:
     plotdata = json.load(file)
-  
-  width = 0.15
-  plt.figure()
-  lapp = None
-  for approach in plotdata:
-    if lapp == None or len(plotdata[approach]["overhead"]) > len(plotdata[lapp]["overhead"]):
-      lapp = approach
-  m = 0
-  for approach in plotdata:
-    appdata = plotdata[approach]
-    x = np.arange(len(appdata["overhead"]))
-    plt.bar(x + width*m, np.array(list(appdata["overhead"].values())), width, color=appdata["color"], label=appdata["label"])
-    m += 1
-  plt.xlabel("# slices")
-  plt.xticks(np.arange(len(plotdata[lapp]["overhead"])), list(plotdata[lapp]["overhead"].keys()))
-  plt.ylabel("Elapsed time (s)")
-  plt.yscale("log")
-  
-  plt.legend(loc="best")
-  plt.tight_layout()
-  plt.savefig(figpath + "elapsed-time.png")
 
+  plot_time(plotdata, "varying-tasks", "# processes", "Time (s)", figpath + "varying-tasks.png")
+  plot_time(plotdata, "varying-data-per-task", "# slices", "Time (s)", figpath + "varying-slices")
+  
 
 
  
