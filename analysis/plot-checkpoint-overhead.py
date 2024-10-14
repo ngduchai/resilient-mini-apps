@@ -27,13 +27,14 @@ def plot_time(data, expname, xlab, ylab, figpath):
     x = np.arange(len(appdata["total"]))
     overhead = np.array(list(appdata["overhead"].values()))
     exectime = np.array(list(appdata["total"].values())) - overhead
-    # plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
-    exectime = np.zeros(len(x))
+    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
+    # exectime = np.zeros(len(x))
     plt.bar(x + width*m, overhead, width, bottom=exectime, color=appconf["color"], label=appconf["label"])
     m += 1
   plt.xlabel(xlab)
   plt.xticks(np.arange(len(data[lapp][expname]["total"])), list(data[lapp][expname]["overhead"].keys()))
   plt.ylabel(ylab)
+  # plt.ylabel("Overhead (s)")
   # plt.yscale("log")
   
   plt.legend(loc="best")
@@ -54,6 +55,8 @@ if __name__ == "__main__":
 
   plot_time(plotdata, "varying-tasks", "# processes", "Time (s)", figpath + "varying-tasks.png")
   plot_time(plotdata, "varying-data-per-task", "# slices", "Time (s)", figpath + "varying-slices")
+  plot_time(plotdata, "drop-slices-64", "Fraction of dropped data", "Time (s)", figpath + "varying-drop-64")
+  plot_time(plotdata, "drop-slices-32", "Fraction of dropped data", "Time (s)", figpath + "varying-drop-32")
   
 
 
