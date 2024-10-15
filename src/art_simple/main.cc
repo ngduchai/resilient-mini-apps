@@ -56,7 +56,7 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     return 0;
 }
 
-bool recover(veloc::client_t *ckpt, const char *name,  int sinogram_size, int &v, int *num_ckpt, int &numrows, float *recon, int *row_index) {
+void recover(veloc::client_t *ckpt, const char *name,  int sinogram_size, int &v, int *num_ckpt, int &numrows, float *recon, int *row_index) {
     ckpt->mem_protect(1, &numrows, 1, sizeof(int));
     v = ckpt->restart_test(name, v);
     if (v > 0) {
@@ -117,29 +117,13 @@ int main(int argc, char* argv[])
     hid_t dataspace_id = H5Dget_space(dataset_id);
     hsize_t dims[3];
     H5Sget_simple_extent_dims(dataspace_id, dims, NULL);
-    std::cout << "Data dimensions: " << dims[0] << " x " << dims[1] << " x " << dims[2] << std::endl;
-    //float* data = new float[dims[0]*dims[1]*dims[2]];
-    //H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-
-    // read slices from the dataset
-    std::cout << "Target dimensions: " << dims[0] << " x [" << beg_index << "-" << beg_index+nslices << "] x " << dims[2] << std::endl;
-    hsize_t start[3] = {0, beg_index, 0};
-    hsize_t count[3] = {dims[0], nslices, dims[2]};
-    H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, start, NULL, count, NULL);
-
-    // Create a memory dataspace
-    hsize_t mem_dims[3] = {dims[0], nslices, dims[2]};
-    hid_t memspace_id = H5Screate_simple(3, mem_dims, NULL);
-
-    // Allocate memory for the hyperslab
-    float* data = new float[dims[0] * nslices * dims[2]];
-
-    // Read the data from the hyperslab
-    H5Dread(dataset_id, H5T_NATIVE_FLOAT, memspace_id, dataspace_id, H5P_DEFAULT, data);
+    // std::cout << "Data dimensions: " << dims[0] << " x " << dims[1] << " x " << dims[2] << std::endl;
+    float* data = new float[dims[0]*dims[1]*dims[2]];
+    H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
 
     //close the dataset
     H5Dclose(dataset_id);
-    H5Sclose(memspace_id);
+
 
     // read the theta
     const char* theta_name = "exchange/theta";
@@ -163,7 +147,7 @@ int main(int argc, char* argv[])
 
     // reconstruct using art
     int dt = dims[0];
-    int dy = nslices; //dims[1];
+    int dy = dims[1];
     int dx = dims[2];
     int ngridx = dx;
     int ngridy = dx;
@@ -174,6 +158,27 @@ int main(int argc, char* argv[])
 
     // swap axis in data dt dy
     float *data_swap = swapDimensions(data, dt, dy, dx, 0, 1);
+
+
+    // duplicate the data to adjust the dy slices with nslices if needed
+    if (nslices > dy) {
+        float * data_tmp = data_swap;
+
+        data_swap = new float [dx*nslices*dt];
+        int additional_slices = nslices - dy;
+        int i = 1;
+        while (additional_slices > dy) {
+            memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*dy);
+            additional_slices -= dy;
+            i++;
+        }
+        if (additional_slices > 0) {
+            memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*additional_slices);
+        }
+        delete [] data_tmp;
+    }
+    dy = nslices;
+
 
     std::cout << "Completed reading the data, starting the reconstruction..." << std::endl;
     std::cout << "dt: " << dt << ", dy: " << dy << ", dx: " << dx << ", ngridx: " << ngridx << ", ngridy: " << ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
@@ -225,6 +230,7 @@ int main(int argc, char* argv[])
     
     // Load the checkpoint if any 
     if (progress > 0) {
+        std::cout << "Found ckpt version " << progress << ". Start recovering" << std::endl;
         recover(ckpt, ckpt_name, sinogram_size, progress, &num_ckpt, num_rows, local_recon, row_indexes);
     }
 
@@ -242,6 +248,7 @@ int main(int argc, char* argv[])
     int active_tasks = num_tasks;
 
     // run the reconstruction
+    std::cout << progress << std::endl;
     while (progress < num_outer_iter) {
 
         // Sync the task status across all tasks
@@ -273,6 +280,9 @@ int main(int argc, char* argv[])
         }
 
         if (!added_tasks.empty()) {
+            if (id == mpi_root) {
+                std::cout << "Found " << added_tasks.size() << " new task(s), start redistribution..." << std::endl;
+            }
             // Some tasks are added, rebalance by moving some slices to new tasks
             int transferred_rows = 0;
             int adj_num_rows = 0;
@@ -346,6 +356,9 @@ int main(int argc, char* argv[])
 
         if (!removed_tasks.empty()) {
             // Some tasks fails, recover their progress from checkpoints
+            if (id == mpi_root) {
+                std::cout << "Found " << added_tasks.size() << " task(s) stop working, start recovery..." << std::endl;
+            }
             int recovered_size = 0;
             float * recovered_recon = nullptr;
             int * recovered_row_indexes = nullptr;
