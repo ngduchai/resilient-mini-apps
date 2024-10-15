@@ -11,6 +11,7 @@
 
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
@@ -40,6 +41,7 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     return transposed;
 }
 
+// Save the reconstruction image as an HDF5 file
 int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     hid_t output_file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (output_file_id < 0) {
@@ -53,6 +55,27 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     H5Fclose(output_file_id);
     return 0;
 }
+
+bool recover(veloc::client_t *ckpt, const char *name,  int sinogram_size, int &v, int *num_ckpt, int &numrows, float *recon, int *row_index) {
+    ckpt->mem_protect(1, &numrows, sizeof(int), 1);
+    v = ckpt->restart_test(name, v);
+    if (v > 0) {
+        ckpt->restart_begin(name, v);
+        // Read # tasks and # row first
+        ckpt->recover_mem(VELOC_RECOVER_SOME, {1});
+        // Adjust the reconstruction area
+        ckpt->mem_protect(0, num_ckpt, sizeof(int), 1);
+        ckpt->mem_protect(2, recon, sizeof(float), numrows*sinogram_size);
+        ckpt->mem_protect(3, row_index, sizeof(int), numrows);
+        // Recover the data
+        ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 2, 3});
+        ckpt->restart_end(true);
+    }else{
+        numrows = 0;
+    }
+}
+
+
 
 int main(int argc, char* argv[])
 {
@@ -144,6 +167,7 @@ int main(int argc, char* argv[])
     int dx = dims[2];
     int ngridx = dx;
     int ngridy = dx;
+    int sinogram_size = ngridx*ngridy;
     //int num_iter = 2;
     //int num_outer_iter = 5;
     //float center = 294.078;
@@ -156,13 +180,17 @@ int main(int argc, char* argv[])
 
     const unsigned int recon_size = dy*ngridx*ngridy;
     float *recon = new float[recon_size];
+    float *local_recon = new float[recon_size];
+    float *local_data = new float[dx*dy*dt];
+    int *row_indexes = new int[dy];
+
 
     /* Initiate MPI Communication */
     MPI_Init(&argc, &argv);
     int id;
     MPI_Comm_rank(MPI_COMM_WORLD, &id);
-    int num_workers;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_workers);
+    int num_tasks;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_tasks);
     const unsigned int mpi_root = 0;
     
     char hostname[HOST_NAME_MAX];
@@ -170,121 +198,64 @@ int main(int argc, char* argv[])
     std::cout << "Task ID " << id << " from " << hostname << std::endl;
 
 
-    /* Calculating the working area based on worker id */
-    int rows_per_worker = dy / num_workers;
-    int extra_rows = dy % num_workers;
-    int w_offset = rows_per_worker*id + std::min(id, extra_rows);
+    /* Initialize the working space */
+    int num_rows = dy / num_tasks;
+    int extra_rows = dy % num_tasks;
+    int w_offset = num_rows*id + std::min(id, extra_rows);
     if (extra_rows != 0 && id < extra_rows) {
-        rows_per_worker++;
+        num_rows++;
     }
-    hsize_t w_dt = dt;
-    hsize_t w_dy = rows_per_worker;
-    hsize_t w_dx = dx;
-    hsize_t w_ngridx = ngridx;
-    hsize_t w_ngridy = ngridy;
-    
-    const unsigned int w_recon_size = rows_per_worker*ngridx*ngridy;
-    // float * w_recon = recon + w_offset*ngridx*ngridy;
-    float * w_recon = new float [w_recon_size];
-    float * w_data = data_swap + w_offset*dt*dx;
-
-    std::cout << "[task-" << id << "]: offset: " << w_offset << ", w_dt: " << w_dt << ", w_dy: " << w_dy << ", w_dx: " << w_dx << ", w_ngridx: " << w_ngridx << ", w_ngridy: " << w_ngridy << ", num_iter: " << num_iter << ", center: " << center << std::endl;
-
+    for (int i = 0; i < num_rows; ++i) {
+        row_indexes[i] = w_offset + i;
+    }
+    memcpy(local_data, data_swap + w_offset*dt*dx, sizeof(float)*num_rows*dt*dx);
 
     // Initiate VeloC
-    veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
-
-    // Tracking number of process
-    int ckpt_num_tasks; 
-    ckpt->mem_protect(0, &ckpt_num_tasks, sizeof(int), 1);
-    // Tracking number of rows
-    int ckpt_num_rows;
-    ckpt->mem_protect(1, &ckpt_num_rows, sizeof(int), 1);
-    // Tracking the reconstruction space
-    float * ckpt_recon = new float[recon_size];
-    ckpt->mem_protect(2, ckpt_recon, sizeof(float), recon_size);
-    // Tracking the row index for each sinogram
-    int * ckpt_row_indexes = new int[dy];
-    ckpt->mem_protect(3, ckpt_row_indexes, sizeof(int), dy);
     const char* ckpt_name = "art_simple";
+    int num_ckpt = num_tasks;
+    int progress = 0;
 
-    int v = ckpt->restart_test(ckpt_name, 0);
-    // if (v > 0) {
-    //     std::cout << "[task-" << id << "]: Found a checkpoint version " << v << " at iteration #" << v-1 << std::endl;
-    //     ckpt->restart_begin(ckpt_name, v);
-    //     // Read # tasks and # row first
-    //     ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 1});
-
-    //     // Adjust the reconstruction area
-    //     ckpt->mem_protect(2, ckpt_recon, sizeof(float), ckpt_num_rows*dx*dt);
-    //     ckpt->mem_protect(3, ckpt_row_indexes, sizeof(int), ckpt_num_rows);
-
-    //     // Recover the data
-    //     ckpt->recover_mem(VELOC_RECOVER_REST, {});
-
-    //     ckpt->restart_end(true);
-    // }
-    // if (ckpt_num_tasks > num_workers) {
-    //     // Number of tasks decrease, so we need to assign more rows to each task
-
-    // }else if (ckpt_num_tasks < num_workers) {
-    //     // Number of tasks increase, so we need to move rows from existing tasks to new ones
-
-    // }
+    // Check if there is are checkpoints from previous run
+    veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
+    ckpt->mem_protect(0, &num_ckpt, sizeof(int), 1);
+    if (id == mpi_root) {
+        progress = ckpt->restart_test(ckpt_name, 0);
+    }
+    MPI_Bcast(&progress, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+    
+    // Load the checkpoint if any 
+    if (progress > 0) {
+        recover(ckpt, ckpt_name, sinogram_size, progress, &num_ckpt, num_rows, local_recon, row_indexes);
+    }
 
     // tracking active workers
-    int * active_tracker = new int[num_workers];
-    int * prev_active_tracker = new int[num_workers];
-    for (int i = 0; i < num_workers; ++i) {
+    int tracker_size = std::max(num_tasks, num_ckpt);
+    int * active_tracker = new int[tracker_size];
+    int * prev_active_tracker = new int[tracker_size];
+    for (int i = 0; i < num_ckpt; ++i) {
         active_tracker[i] = 1;
     }
+    for (int i = num_ckpt; i < num_tasks; ++i) {
+        active_tracker[i] = 0;
+    }
     int task_is_active = 1;
-    int active_tasks = num_workers;
+    int active_tasks = num_tasks;
 
     // run the reconstruction
-    for (int i = v; i < num_outer_iter; i++)
-    {
-        std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
-        // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
-        art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+    while (progress < num_outer_iter) {
 
-        // Also push the result to disk for further quality analysis
-        MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
-        if (id == mpi_root) {
-            
-            std::ostringstream oss;
-            oss << "recon_tmp_" << std::setw(4) << std::setfill('0') << i << ".h5";
-            std::string output_filename = oss.str();
-            const char* output_filename_cstr = output_filename.c_str();
-            hsize_t output_dims[3] = {dy, ngridy, ngridx};
-
-            if (saveAsHDF5(output_filename_cstr, recon, output_dims) != 0) {
-                std::cerr << "Error: Unable to create file " << output_filename << std::endl;
-                return 1;
-            }
-            else{
-                std::cout << "Saved a temporary reconstructed image as " << output_filename << std::endl;
-            }
-        }
-
-        // Checkpointing
-        if (!ckpt->checkpoint(ckpt_name, i+1)) {
-            throw std::runtime_error("Checkpointing failured");
-        }
-        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
-
-        // Redistribute data if needed
+        // Sync the task status across all tasks
         std::swap(active_tracker, prev_active_tracker);
         MPI_Allgather(&task_is_active, 1, MPI_INT, active_tracker, 1, MPI_INT, MPI_COMM_WORLD);
         // Check for new and old tasks
-        std::vector<int> added_nodes, removed_nodes;
+        std::vector<int> added_tasks, removed_tasks;
         active_tasks = 0;
         int task_index = 0;
-        for (int j = 0; j < num_workers; ++j) {
+        for (int j = 0; j < tracker_size; ++j) {
             if (active_tracker[j] == 1 && prev_active_tracker[j] == 0) {
-                added_nodes.push_back(j);
+                added_tasks.push_back(j);
             }else if (active_tracker[j] == 0 && prev_active_tracker[j] == 1) {
-                removed_nodes.push_back(j);
+                removed_tasks.push_back(j);
             }
             if (active_tracker[j] == 1) {
                 if (j == id) {
@@ -294,42 +265,79 @@ int main(int argc, char* argv[])
             }
         }
 
-        if (!removed_nodes.empty()) {
+        if (!added_tasks.empty()) {
+            // Some tasks are added, rebalance by moving some slices to new tasks
+            int adj_num_rows = dy / active_tasks;
+            int extra_rows = dy % active_tasks;
+            int w_offset = adj_num_rows*task_index + std::min(id, extra_rows);
+            if (extra_rows != 0 && task_index < extra_rows) {
+                adj_num_rows++;
+            }
+            int transferred_rows = num_rows - adj_num_rows;
+        }
+
+        if (!removed_tasks.empty()) {
             int recovered_size = 0;
             float * recovered_recon = nullptr;
             int * recovered_row_indexes = nullptr;
             float * local_recovered_recon = nullptr;
             int * local_recovered_row_indexes = nullptr;
             if (task_is_active) {
-                int num_ckpt = (removed_nodes.size() / active_tasks);
-                if (removed_nodes.size() % active_tasks > task_index) {
+                // Remainning active tasks recover the checkpoints of inactive ones
+                int num_ckpt = (removed_tasks.size() / active_tasks);
+                if (removed_tasks.size() % active_tasks > task_index) {
                     num_ckpt++;
                 }
 
-                recovered_size = num_ckpt; // TODO: Correct with the right size
-
                 local_recovered_recon = new float [recon_size];
-                local_recovered_row_indexes = new int [recon_size];
+                local_recovered_row_indexes = new int [dy];
 
                 for (int j = 0; j < num_ckpt; ++j) {
-                    // TODO: Recover data from checkpoints
+                    unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
+                    
+                    recovered_size += numrows;
                 }
             }
-            
+            // Gather the checkpoints at the root then redistribute across tasks
+            int total_recovered_size = 0;
+            MPI_Allreduce(&recovered_size, &total_recovered_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
             if (id == mpi_root) {
-                recovered_recon = new float [recon_size];
-                recovered_row_indexes = new int [recon_size];
+                recovered_recon = new float [total_recovered_size];
+                recovered_row_indexes = new int [total_recovered_size];
             }
-
             // Sync with root
             MPI_Gather(local_recovered_recon, recovered_size, MPI_FLOAT, recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
             MPI_Gather(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_recon, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
             // Estimate the data size each task will receive
-            recovered_size = 1;
+            if (task_is_active) {
+                recovered_size = total_recovered_size / active_tasks;
+                if (total_recovered_size % active_tasks > task_index) {
+                    recovered_size++;
+                }
+            }else{
+                recovered_size = 0;
+            }
             // Reditribute data from root
             MPI_Scatter(recovered_recon, recovered_size, MPI_FLOAT, local_recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
             MPI_Scatter(recovered_row_indexes, recovered_size, MPI_FLOAT, local_recovered_row_indexes, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+
+            // Make sure the rows are up to date
+            art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         }
+
+        std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
+        // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+        art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
+
+        // Save progress with checkpoint
+        progress++;
+        num_ckpt = active_tasks;
+        if (!ckpt->checkpoint(ckpt_name, progress)) {
+            throw std::runtime_error("Checkpointing failured");
+        }
+        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
+
+        
         
 
     }
