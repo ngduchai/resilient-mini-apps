@@ -57,16 +57,16 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
 }
 
 bool recover(veloc::client_t *ckpt, const char *name,  int sinogram_size, int &v, int *num_ckpt, int &numrows, float *recon, int *row_index) {
-    ckpt->mem_protect(1, &numrows, sizeof(int), 1);
+    ckpt->mem_protect(1, &numrows, 1, sizeof(int));
     v = ckpt->restart_test(name, v);
     if (v > 0) {
         ckpt->restart_begin(name, v);
         // Read # tasks and # row first
         ckpt->recover_mem(VELOC_RECOVER_SOME, {1});
         // Adjust the reconstruction area
-        ckpt->mem_protect(0, num_ckpt, sizeof(int), 1);
-        ckpt->mem_protect(2, recon, sizeof(float), numrows*sinogram_size);
-        ckpt->mem_protect(3, row_index, sizeof(int), numrows);
+        ckpt->mem_protect(0, num_ckpt, 1, sizeof(int));
+        ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
+        ckpt->mem_protect(3, row_index, numrows, sizeof(int));
         // Recover the data
         ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 2, 3});
         ckpt->restart_end(true);
@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &id);
     int num_tasks;
     MPI_Comm_size(MPI_COMM_WORLD, &num_tasks);
-    const unsigned int mpi_root = 0;
+    unsigned int mpi_root = 0;
     
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
@@ -252,12 +252,19 @@ int main(int argc, char* argv[])
         active_tasks = 0;
         int task_index = 0;
         for (int j = 0; j < tracker_size; ++j) {
+            // Detect task status changes
             if (active_tracker[j] == 1 && prev_active_tracker[j] == 0) {
                 added_tasks.push_back(j);
             }else if (active_tracker[j] == 0 && prev_active_tracker[j] == 1) {
                 removed_tasks.push_back(j);
             }
+            // Update task_index 
             if (active_tracker[j] == 1) {
+                // Choose the active task with lowest id as new root
+                if (active_tasks == 0) {
+                    mpi_root = j;
+                }
+                // The task new index is the its id ranked in the list of remaining active tasks
                 if (j == id) {
                     task_index = active_tasks;
                 }
@@ -267,35 +274,103 @@ int main(int argc, char* argv[])
 
         if (!added_tasks.empty()) {
             // Some tasks are added, rebalance by moving some slices to new tasks
-            int adj_num_rows = dy / active_tasks;
-            int extra_rows = dy % active_tasks;
-            int w_offset = adj_num_rows*task_index + std::min(id, extra_rows);
-            if (extra_rows != 0 && task_index < extra_rows) {
-                adj_num_rows++;
+            int transferred_rows = 0;
+            int adj_num_rows = 0;
+            // First, determine if a task is just added and its index
+            int transfer_index = -1;
+            for (int i = 0; i < added_tasks.size(); ++i) {
+                if (added_tasks[i] == id) {
+                    transfer_index = i;
+                    break;
+                }
             }
-            int transferred_rows = num_rows - adj_num_rows;
+            // Old task detemine the number of rows they will send to new tasks
+            if (task_is_active && transfer_index == -1) {
+                adj_num_rows = dy / num_tasks;
+                int extra_rows = dy % num_tasks;
+                int w_offset = adj_num_rows*task_index + std::min(id, extra_rows);
+                if (extra_rows != 0 && task_index < extra_rows) {
+                    adj_num_rows++;
+                }
+                transferred_rows = num_rows - adj_num_rows;
+            }
+            // Transfer rows from old tasks to mpi_root
+            int total_transferred_rows = 0;
+            MPI_Allreduce(&transferred_rows, &total_transferred_rows, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            float * collected_recon = nullptr;
+            int * collected_indexes = nullptr;
+            if (id == mpi_root) {
+                float * collected_recon = new float[recon_size];
+                int * collected_indexes = new int[dy];
+            }
+            MPI_Gather(local_recon+adj_num_rows*sinogram_size, transferred_rows*sinogram_size, MPI_FLOAT, collected_recon, transferred_rows*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            MPI_Gather(row_indexes+adj_num_rows, transferred_rows, MPI_INT, collected_indexes, transferred_rows, MPI_INT, mpi_root, MPI_COMM_WORLD);
+
+            // Update the number of rows each that will process
+            num_rows -= transferred_rows;
+
+            // Transfer the rows from old tasks to new tasks
+            transferred_rows = 0;
+            if (task_is_active && transfer_index != -1) {
+                // only receive data if the task was added
+                transferred_rows = total_transferred_rows / added_tasks.size();
+                extra_rows = total_transferred_rows % added_tasks.size();
+                if (transfer_index < extra_rows) {
+                    transferred_rows++;
+                }
+            }
+            MPI_Scatter(collected_recon, transferred_rows*sinogram_size, MPI_FLOAT, local_recon + num_rows*sinogram_size, transferred_rows*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            MPI_Scatter(collected_indexes+num_rows, transferred_rows, MPI_INT, row_indexes, transferred_rows, MPI_INT, mpi_root, MPI_COMM_WORLD);
+
+            // Update input data for tasks receiving new slices
+            if (task_is_active && transfer_index != -1) {
+                for (int i = 0; i < transferred_rows; ++i) {
+                    memcpy(local_data + num_rows*dt*dx + i*dt*dx, data_swap+row_indexes[num_rows+i], sizeof(float)*dt*dx);
+                }
+            }
+            num_rows += transferred_rows;
+
+            if (task_is_active) {
+                ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
+                ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
+                ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
+                ckpt->mem_protect(2, local_recon, num_rows*sinogram_size, sizeof(float));
+                ckpt->mem_protect(3, row_indexes, num_rows, sizeof(int));
+            }
+
+            if (id == mpi_root) {
+                delete [] collected_recon;
+                delete [] collected_indexes;
+            }
         }
 
         if (!removed_tasks.empty()) {
+            // Some tasks fails, recover their progress from checkpoints
             int recovered_size = 0;
             float * recovered_recon = nullptr;
             int * recovered_row_indexes = nullptr;
-            float * local_recovered_recon = nullptr;
-            int * local_recovered_row_indexes = nullptr;
+            int * ckpt_progress = nullptr;
+            float * local_recovered_recon = new float [recon_size];
+            int * local_recovered_row_indexes = new int [dy];
+            int * local_ckpt_progress = new int [dy];
             if (task_is_active) {
-                // Remainning active tasks recover the checkpoints of inactive ones
-                int num_ckpt = (removed_tasks.size() / active_tasks);
+                // Remaining active tasks recover the checkpoints of inactive ones
+                int num = (removed_tasks.size() / active_tasks);
                 if (removed_tasks.size() % active_tasks > task_index) {
-                    num_ckpt++;
+                    num++;
                 }
-
-                local_recovered_recon = new float [recon_size];
-                local_recovered_row_indexes = new int [dy];
-
-                for (int j = 0; j < num_ckpt; ++j) {
+                // Read data from checkpoints
+                for (int j = 0; j < num; ++j) {
+                    int ckpt_size = removed_tasks.size();
+                    int numread = 0;
+                    int ckpt_progress = 0;
                     unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
-                    
-                    recovered_size += numrows;
+                    veloc::client_t* recover_ckpt = veloc::get_client(ckpt_id, check_point_config);
+                    recover(recover_ckpt, ckpt_name, sinogram_size, ckpt_progress, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
+                    for (int k = 0; k < numread; ++k) {
+                        local_ckpt_progress[recovered_size+k] = ckpt_progress;
+                    }
+                    recovered_size += numread;
                 }
             }
             // Gather the checkpoints at the root then redistribute across tasks
@@ -308,6 +383,7 @@ int main(int argc, char* argv[])
             // Sync with root
             MPI_Gather(local_recovered_recon, recovered_size, MPI_FLOAT, recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
             MPI_Gather(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_recon, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            MPI_Gather(local_ckpt_progress, recovered_size, MPI_INT, ckpt_progress, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
             // Estimate the data size each task will receive
             if (task_is_active) {
                 recovered_size = total_recovered_size / active_tasks;
@@ -320,32 +396,99 @@ int main(int argc, char* argv[])
             // Reditribute data from root
             MPI_Scatter(recovered_recon, recovered_size, MPI_FLOAT, local_recovered_recon, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
             MPI_Scatter(recovered_row_indexes, recovered_size, MPI_FLOAT, local_recovered_row_indexes, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            MPI_Scatter(ckpt_progress, recovered_size, MPI_FLOAT, local_ckpt_progress, recovered_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
 
+            
             // Make sure the rows are up to date
-            art(w_data, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+            if (task_is_active && recovered_size > 0) {
+                float * tmp_recon = new float [recon_size];
+                int * tmp_indexes = new int [recovered_size];
+                float * tmp_data = new float[recovered_size*dx*dt];
+                int *tmp_progress = new int[recovered_size];
+
+                while (recovered_size > 0) {
+                    int remain_size = 0;
+                    for (int i = 0; i < recovered_size; ++i) {
+                        if (ckpt_progress[i] == progress) {
+                            memcpy(local_recon + num_rows*sinogram_size, local_recovered_recon + i*sinogram_size, sinogram_size);
+                            row_indexes[num_rows] = local_recovered_row_indexes[i];
+                            memcpy(local_data + num_rows*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
+                            num_rows++;
+                        }else{
+                            memcpy(tmp_recon + remain_size*sinogram_size, local_recovered_recon + i*sinogram_size, sinogram_size);
+                            row_indexes[remain_size] = local_recovered_row_indexes[i];
+                            memcpy(local_data + remain_size*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
+                            tmp_progress[remain_size] = ckpt_progress[i];
+                            remain_size++;
+                        }
+                    }
+                    std::swap(tmp_recon, local_recovered_recon);
+                    std::swap(tmp_indexes, local_recovered_row_indexes);
+                    std::swap(tmp_progress, ckpt_progress);
+                    recovered_size = remain_size;
+                    // Reconstruct from checkpoints
+                    art(tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
+                    for (int i=0; i < recovered_size; ++i) {
+                        ckpt_progress[i]++;
+                    }
+                    
+                }
+                delete [] tmp_recon;
+                delete [] tmp_indexes;
+                delete [] tmp_data;
+                delete [] tmp_progress;
+
+            }
+
+            if (task_is_active) {
+                ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
+                ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
+                ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
+                ckpt->mem_protect(2, local_recon, num_rows*sinogram_size, sizeof(float));
+                ckpt->mem_protect(3, row_indexes, num_rows, sizeof(int));
+            }
+
+            delete [] local_recovered_recon;
+            delete [] local_recovered_row_indexes;
+            if (id == mpi_root) {
+                delete [] recovered_recon;
+                delete [] recovered_row_indexes;
+            }
+
         }
 
-        std::cout<< "[task-" << id << "]: Outer iteration: " << i << std::endl;
+        std::cout<< "[task-" << id << "]: Outer iteration: " << progress << std::endl;
         // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
         art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
 
         // Save progress with checkpoint
         progress++;
         num_ckpt = active_tasks;
-        if (!ckpt->checkpoint(ckpt_name, progress)) {
-            throw std::runtime_error("Checkpointing failured");
+        if (task_is_active) {
+            if (!ckpt->checkpoint(ckpt_name, progress)) {
+                throw std::runtime_error("Checkpointing failured");
+            }
+            std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
         }
-        std::cout << "[task-" << id << "]: Checkpointed version " << i+1 << std::endl;
-
-        
-        
 
     }
 
     if (id == mpi_root) {
         std::cout << "Reconstructed data from workers" << std::endl;
     }
-    MPI_Gather(w_recon, w_recon_size, MPI_FLOAT, recon, w_recon_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+    float * tmp_recon = nullptr;
+    int * tmp_row_indexes = nullptr;
+    if (id == mpi_root) {
+        tmp_recon = new float[recon_size];
+        tmp_row_indexes = new int [dy];
+    }
+    MPI_Gather(local_recon, num_rows*sinogram_size, MPI_FLOAT, tmp_recon, num_rows*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+    MPI_Gather(row_indexes, num_rows, MPI_INT, tmp_row_indexes, num_rows, MPI_INT, mpi_root, MPI_COMM_WORLD);
+    if (id == mpi_root) {
+        for (int i = 0; i < dy; ++i) {
+            memcpy(recon + i*sinogram_size, tmp_recon + tmp_row_indexes[i]*sinogram_size, sinogram_size);
+        }
+    }
 
     const char * img_name = "recon.h5";
     if (id == mpi_root) {
@@ -373,7 +516,9 @@ int main(int argc, char* argv[])
     delete[] data_swap;
     delete[] theta;
     delete[] recon;
-    delete[] w_recon;
+    delete[] local_recon;
+    delete[] row_indexes;
+    delete[] local_data;
 
     MPI_Finalize();
 
