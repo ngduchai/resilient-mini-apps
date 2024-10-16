@@ -195,14 +195,14 @@ int main(int argc, char* argv[])
         int additional_slices = nslices - dy;
         int i = 1;
         while (additional_slices > dy) {
-            memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*dy);
-            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, dx*original_dt*dy);
+            memcpy(data_swap + i*dx*dt*dy, data_tmp, sizeof(float)*dx*dt*dy);
+            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, sizeof(float)*dx*original_dt*dy);
             additional_slices -= dy;
             i++;
         }
         if (additional_slices > 0) {
-            memcpy(data_swap + i*dx*dt*dy, data_tmp, dx*dt*additional_slices);
-            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, dx*original_dt*additional_slices);
+            memcpy(data_swap + i*dx*dt*dy, data_tmp, sizeof(float)*dx*dt*additional_slices);
+            memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, sizeof(float)*dx*original_dt*additional_slices);
         }
         delete [] data_tmp;
     }
