@@ -192,8 +192,8 @@ int main(int argc, char* argv[])
 
         data_swap = new float [dx*nslices*dt];
         original_data_swap = new float [dx*nslices*original_dt];
-        int additional_slices = nslices - dy;
-        int i = 1;
+        int additional_slices = nslices;
+        int i = 0;
         while (additional_slices > dy) {
             memcpy(data_swap + i*dx*dt*dy, data_tmp, sizeof(float)*dx*dt*dy);
             memcpy(original_data_swap + i*dx*original_dt*dy, original_data_tmp, sizeof(float)*dx*original_dt*dy);
