@@ -28,13 +28,13 @@ def plot_time(data, expname, xlab, ylab, figpath):
     overhead = np.array(list(appdata["overhead"].values()))
     exectime = np.array(list(appdata["total"].values())) - overhead
     plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
-    # exectime = np.zeros(len(x))
+    exectime = np.zeros(len(x))
     plt.bar(x + width*m, overhead, width, bottom=exectime, color=appconf["color"], label=appconf["label"])
     m += 1
   plt.xlabel(xlab)
   plt.xticks(np.arange(len(data[lapp][expname]["total"])), list(data[lapp][expname]["overhead"].keys()))
   plt.ylabel(ylab)
-  # plt.ylabel("Overhead (s)")
+  plt.ylabel("Overhead (s)")
   # plt.yscale("log")
   
   plt.legend(loc="best")

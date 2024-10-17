@@ -56,7 +56,7 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     return 0;
 }
 
-void recover(veloc::client_t *ckpt, const char *name,  int sinogram_size, int &progress, int *num_ckpt, int &numrows, float *recon, int *row_index) {
+void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size, int &progress, int *num_ckpt, int &numrows, float *recon, int *row_index) {
     ckpt->mem_protect(1, &numrows, 1, sizeof(int));
     int v = ckpt->restart_test(name, v);
     if (v > 0) {
@@ -223,8 +223,10 @@ int main(int argc, char* argv[])
     int progress = 0;
 
     // Check if there is are checkpoints from previous run
+    // veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
     veloc::client_t *ckpt = veloc::get_client((unsigned int)id, check_point_config);
-    ckpt->mem_protect(0, &num_ckpt, sizeof(int), 1);
+    
+    ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
     if (id == mpi_root) {
         progress = ckpt->restart_test(ckpt_name, 0);
     }
@@ -232,8 +234,8 @@ int main(int argc, char* argv[])
     
     // Load the checkpoint if any 
     if (progress > 0) {
-        local_recon[0] = 1000 + id;
-        recover(ckpt, ckpt_name, sinogram_size, progress, &num_ckpt, num_rows, local_recon, row_indexes);
+        std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
+        recover(ckpt, id, ckpt_name, sinogram_size, progress, &num_ckpt, num_rows, local_recon, row_indexes);
         for (int i = 0; i < num_rows; ++i) {
             memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
         }
@@ -431,16 +433,36 @@ int main(int argc, char* argv[])
                 for (int j = 0; j < num; ++j) {
                     int ckpt_size = removed_tasks.size();
                     int numread = 0;
-                    int v = 0;
+                    int v = progress;
                     unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
-                    veloc::client_t* recover_ckpt = veloc::get_client(ckpt_id, check_point_config);
-                    recover(recover_ckpt, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
+                    std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
+                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
                     for (int k = 0; k < numread; ++k) {
                         local_ckpt_progress[recovered_size+k] = v;
                     }
+                    std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << ckpt_id << ", progress: " << v << " num_row: " << numread << " num_ckpt: " << ckpt_size << std::endl;
                     recovered_size += numread;
                 }
             }
+
+            std::cout << "recovered_size: " << recovered_size << " sinogram_size: " << sinogram_size << std::endl;
+            float *ckpt_data = new float[recon_size];
+            memcpy(ckpt_data, local_recovered_recon, sizeof(float)*recovered_size*sinogram_size);
+
+            bool correct = true;
+            for (int i = 0; i < sinogram_size; ++i) {
+                if (local_recon[i] != ckpt_data[i]) {
+                    std::cout << i << ": " << local_recon[i] << " -- " << ckpt_data[i] << std::endl;
+                    correct = false;
+                    break;
+                }
+            }
+            if (correct) {
+                std::cout << "Checkpoints are identical" << std::endl;
+            }else{
+                std::cout << "Checkpoints are not identical" << std::endl;
+            }
+
 
             // Gather the checkpoints at the root then redistribute across tasks
             if (id == mpi_root) {
@@ -461,7 +483,7 @@ int main(int argc, char* argv[])
                 }
             }
             // Sync with root
-            MPI_Gatherv(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_recon, collected_recovered_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            MPI_Gatherv(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_row_indexes, collected_recovered_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
             MPI_Gatherv(local_ckpt_progress, recovered_size, MPI_INT, ckpt_progress, collected_recovered_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
             if (id == mpi_root) {
                 for (int i = 0; i < num_tasks; ++i) {
@@ -471,6 +493,33 @@ int main(int argc, char* argv[])
             }
             MPI_Gatherv(local_recovered_recon, recovered_size*sinogram_size, MPI_FLOAT, recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
             
+            correct = true;
+            for (int i = 0; i < sinogram_size; ++i) {
+                if (local_recovered_recon[i] != ckpt_data[i]) {
+                    std::cout << i << ": " << local_recovered_recon[i] << " -- " << ckpt_data[i] << std::endl;
+                    correct = false;
+                    break;
+                }
+            }
+            if (correct) {
+                std::cout << "Transmision is correct" << std::endl;
+            }else{
+                std::cout << "Transmission is incorrect" << std::endl;
+            }
+            correct = true;
+            for (int i = 0; i < sinogram_size; ++i) {
+                if (local_recon[i] != local_recovered_recon[i]) {
+                    std::cout << i << ": " << local_recon[i] << " -- " << local_recovered_recon[i] << std::endl;
+                    correct = false;
+                    break;
+                }
+            }
+            if (correct) {
+                std::cout << "Transmision is correct" << std::endl;
+            }else{
+                std::cout << "Transmission is incorrect" << std::endl;
+            }
+
             std::cout << "[task-" << id << "]: complete collecting data at root" << std::endl;
 
             // Estimate the data size each task will receive
@@ -486,7 +535,7 @@ int main(int argc, char* argv[])
             if (id == mpi_root) {
                 displacements[0] = 0;
                 for (int i = 1; i < num_tasks; ++i) {
-                    displacements[i] = displacements[i-1] + collected_recovered_rows[i-1]; 
+                    displacements[i] = displacements[i-1] + collected_recovered_rows[i-1];
                 }
             }
             
@@ -500,6 +549,20 @@ int main(int argc, char* argv[])
                 }
             }
             MPI_Scatterv(recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, local_recovered_recon, recovered_size*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+
+            correct = true;
+            for (int i = 0; i < sinogram_size; ++i) {
+                if (local_recovered_recon[i] != ckpt_data[i]) {
+                    std::cout << i << ": " << local_recovered_recon[i] << " -- " << ckpt_data[i] << std::endl;
+                    correct = false;
+                    break;
+                }
+            }
+            if (correct) {
+                std::cout << "Transmision is correct" << std::endl;
+            }else{
+                std::cout << "Transmission is incorrect" << std::endl;
+            }
 
             // Make sure the rows are up to date
             if (task_is_active && recovered_size > 0) {
@@ -516,25 +579,26 @@ int main(int argc, char* argv[])
                             memcpy(local_recon + num_rows*sinogram_size, local_recovered_recon + i*sinogram_size, sizeof(float)*sinogram_size);
                             row_indexes[num_rows] = local_recovered_row_indexes[i];
                             memcpy(local_data + num_rows*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
-                            std::cout << num_rows << std::endl;
                             num_rows++;
                         }else{
                             memcpy(tmp_recon + remain_size*sinogram_size, local_recovered_recon + i*sinogram_size, sizeof(float)*sinogram_size);
-                            row_indexes[remain_size] = local_recovered_row_indexes[i];
-                            memcpy(local_data + remain_size*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
+                            tmp_indexes[remain_size] = local_recovered_row_indexes[i];
+                            memcpy(tmp_data + remain_size*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
                             tmp_progress[remain_size] = ckpt_progress[i];
                             remain_size++;
                         }
                     }
-                    std::cout << "Total recover size: " << total_recovered_size << std::endl;
                     std::swap(tmp_recon, local_recovered_recon);
                     std::swap(tmp_indexes, local_recovered_row_indexes);
                     std::swap(tmp_progress, ckpt_progress);
                     recovered_size = remain_size;
+                    std::cout << "Recover size: " << recovered_size << std::endl;
                     // Reconstruct from checkpoints
-                    art(tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
-                    for (int i=0; i < recovered_size; ++i) {
-                        ckpt_progress[i]++;
+                    if (recovered_size > 0) {
+                        art(tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
+                        for (int i=0; i < recovered_size; ++i) {
+                            ckpt_progress[i]++;
+                        }
                     }
                     
                 }
@@ -543,6 +607,24 @@ int main(int argc, char* argv[])
                 delete [] tmp_data;
                 delete [] tmp_progress;
 
+            }
+
+            for (int i = 0; i < sinogram_size; ++i) {
+                if (local_recon[i] != ckpt_data[i]) {
+                    std::cout << i << ": " << local_recon[sinogram_size+i] << " -- " << ckpt_data[i] << std::endl;
+                    correct = false;
+                    break;
+                }
+                if (local_recon[i] != local_recon[sinogram_size+i]) {
+                    std::cout << i << ": " << local_recon[sinogram_size+i] << " -- " << local_recon[sinogram_size+i] << std::endl;
+                    correct = false;
+                    break;
+                }
+            }
+            if (correct) {
+                std::cout << "Transmision is correct" << std::endl;
+            }else{
+                std::cout << "Transmission is incorrect" << std::endl;
             }
 
             if (task_is_active) {
@@ -570,13 +652,13 @@ int main(int argc, char* argv[])
 
         // Save progress with checkpoint
         progress++;
-        num_ckpt = active_tasks;
-        if (task_is_active) {
-            if (!ckpt->checkpoint(ckpt_name, progress)) {
-                throw std::runtime_error("Checkpointing failured");
-            }
-            std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
-        }
+        // num_ckpt = active_tasks;
+        // if (task_is_active) {
+        //     if (!ckpt->checkpoint(ckpt_name, progress)) {
+        //         throw std::runtime_error("Checkpointing failured");
+        //     }
+        //     std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
+        // }
 
     }
 
