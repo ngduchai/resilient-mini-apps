@@ -57,29 +57,30 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
 }
 
 void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size, int &progress, int *num_ckpt, int &numrows, float *recon, int *row_index) {
-    // ckpt->mem_protect(1, &numrows, 1, sizeof(int));
-    // int v = ckpt->restart_test(name, progress, id);
-    // if (v > 0) {
-    //     ckpt->restart_begin(name, v, id);
-    //     // Read # tasks and # row first
-    //     ckpt->recover_mem(VELOC_RECOVER_SOME, {1});
-    //     // Adjust the reconstruction area
-    //     ckpt->mem_protect(0, num_ckpt, 1, sizeof(int));
-    //     ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
-    //     ckpt->mem_protect(3, row_index, numrows, sizeof(int));
-    //     // Recover the data
-    //     ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 2, 3});
-    //     ckpt->restart_end(true);
-    // }else{
-    //     numrows = 0;
-    // }
-    ckpt->mem_protect(0, num_ckpt, 1, sizeof(int));
     ckpt->mem_protect(1, &numrows, 1, sizeof(int));
-    ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
-    ckpt->mem_protect(3, row_index, numrows, sizeof(int));
-    if (ckpt->restart(name, progress, id) == false) {
+    int v = ckpt->restart_test(name, progress, id);
+    if (v > 0) {
+        ckpt->restart_begin(name, v, id);
+        // Read # tasks and # row first
+        ckpt->recover_mem(VELOC_RECOVER_SOME, {1});
+        // Adjust the reconstruction area
+        ckpt->mem_protect(0, num_ckpt, 1, sizeof(int));
+        ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
+        ckpt->mem_protect(3, row_index, numrows, sizeof(int));
+        // Recover the data
+        ckpt->recover_mem(VELOC_RECOVER_SOME, {0, 2, 3});
+        ckpt->restart_end(true);
+        progress = v;
+    }else{
         numrows = 0;
     }
+    // ckpt->mem_protect(0, num_ckpt, 1, sizeof(int));
+    // ckpt->mem_protect(1, &numrows, 1, sizeof(int));
+    // ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
+    // ckpt->mem_protect(3, row_index, numrows, sizeof(int));
+    // if (ckpt->restart(name, progress, id) == false) {
+    //     numrows = 0;
+    // }
 
 }
 
@@ -233,7 +234,7 @@ int main(int argc, char* argv[])
     ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
     
     if (id == mpi_root) {
-        progress = ckpt->restart_test(ckpt_name, 0);
+        progress = ckpt->restart_test(ckpt_name, 0, id);
     }
     MPI_Bcast(&progress, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
     
@@ -594,7 +595,7 @@ int main(int argc, char* argv[])
 
         // Save progress with checkpoint
         progress++;
-        num_ckpt = active_tasks;
+        // num_ckpt = active_tasks;
         // if (task_is_active) {
         //     if (!ckpt->checkpoint(ckpt_name, progress)) {
         //         throw std::runtime_error("Checkpointing failured");
@@ -618,6 +619,7 @@ int main(int argc, char* argv[])
         collected_rows = new int[num_tasks];
         displacements = new int[num_tasks];
     } 
+    std::cout << "Send numrow" << std::endl;
     MPI_Gather(&num_rows, 1, MPI_INT, collected_rows, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
     if (id == mpi_root) {
         displacements[0] = 0;
@@ -626,6 +628,7 @@ int main(int argc, char* argv[])
 
         }
     }
+    std::cout << "Send row indexes" << std::endl;
     MPI_Gatherv(row_indexes, num_rows, MPI_INT, tmp_row_indexes, collected_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
     if (id == mpi_root) {
         for (int i = 0; i < num_tasks; ++i) {
@@ -633,12 +636,14 @@ int main(int argc, char* argv[])
             collected_rows[i] *= sinogram_size;
         }
     }
+    std::cout << "Send recon" << std::endl;
     MPI_Gatherv(local_recon, num_rows*sinogram_size, MPI_FLOAT, tmp_recon, collected_rows, displacements, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
 
     // MPI_Gather(local_recon, num_rows*sinogram_size, MPI_FLOAT, tmp_recon, num_rows*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
     // MPI_Gather(row_indexes, num_rows, MPI_INT, tmp_row_indexes, num_rows, MPI_INT, mpi_root, MPI_COMM_WORLD);
     if (id == mpi_root) {
         for (int i = 0; i < dy; ++i) {
+            std::cout << "Write data " << tmp_row_indexes[i] << " <--" << i << std::endl;
             memcpy(recon + tmp_row_indexes[i]*sinogram_size, tmp_recon + i*sinogram_size, sizeof(float)*sinogram_size);
         }
         delete [] tmp_recon;
