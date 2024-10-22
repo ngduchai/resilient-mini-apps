@@ -268,18 +268,29 @@ int main(int argc, char* argv[])
     //     {0, 1, 0, 1, 0, 0, 0, 1, 1, 0},
     //     {1, 0, 1, 0, 1, 1, 1, 0, 0, 1},
     // };
-    std::vector<int> task_state_history(num_outer_iter);
-    
-    std::string state_info = "[";
-    for (int i = 0; i < num_outer_iter; ++i) {
-        task_state_history[i] = d(gen) ? 0 : 1;
-        if (id == mpi_root) {
-            task_state_history[i] = 1;
-        }
-        state_info += " " + std::to_string(i) + ": " + std::to_string(task_state_history[i]) + ", ";
-    }
-    state_info += "]";
-    std::cout << "[Task-" << id << "]: State history: " << state_info << std::endl;
+     std::vector<std::vector<int>> task_states = {
+        {1, 0, 1, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 1, 0, 0, 0, 0, 0, 0},
+        {1, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 1, 0, 0, 0, 0, 0, 0}
+    };
+    // std::vector<int> task_state_history(num_outer_iter);
+    // std::string state_info = "[";
+    // for (int i = 0; i < num_outer_iter; ++i) {
+    //     task_state_history[i] = d(gen) ? 0 : 1;
+    //     if (id == mpi_root) {
+    //         task_state_history[i] = 1;
+    //     }
+    //     state_info += " " + std::to_string(i) + ": " + std::to_string(task_state_history[i]) + ", ";
+    // }
+    // state_info += "]";
+    // std::cout << "[Task-" << id << "]: State history: " << state_info << std::endl;
     
     if (id == mpi_root) {
         progress = ckpt->restart_test(ckpt_name, 0, id);
@@ -527,7 +538,8 @@ int main(int argc, char* argv[])
                     int ckpt_size = removed_tasks.size();
                     int numread = dy;
                     int v = progress;
-                    unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
+                    // unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
+                    unsigned int ckpt_id = removed_tasks[active_tasks*j + task_index];
                     std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
                     recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
                     for (int k = 0; k < numread; ++k) {
@@ -705,13 +717,12 @@ int main(int argc, char* argv[])
         ckpt_time += ckpt_elapsed_time.count();
 
         // Update state
-        // if (progress < task_states.size()) {
-        //     task_is_active = task_states[progress][id];
-        // }
-        if (progress < task_state_history.size()) {
-            task_is_active = task_state_history[progress];
+        if (progress < task_states.size()) {
+            task_is_active = task_states[progress][id];
         }
-        // task_is_active = task_states[progress][id];
+        // if (progress < task_state_history.size()) {
+        //     task_is_active = task_state_history[progress];
+        // }
 
         // Do the reconstruction
         if (task_is_active && progress < num_outer_iter && num_rows > 0) {
