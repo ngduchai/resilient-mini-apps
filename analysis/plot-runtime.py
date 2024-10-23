@@ -27,23 +27,27 @@ def plot_fig(data, xlab, ylab, figpath):
     appdata = data[approach]["elapsed-time"]
     prob = []
     ckpt = []
+    comm = []
     recovery = []
     total = []
     for info in appdata:
       prob.append(info["prob"])
       ckpt.append(info["ckpt"])
       recovery.append(info["recover"])
+      comm.append(info["comm"])
       total.append(info["total"])
     if probs == None:
       probs = prob
     x = np.arange(len(prob))
     ckpt = np.array(ckpt)
     recovery = np.array(recovery)
+    comm = np.array(comm) - recovery
     total = np.array(total)
-    exectime = total - recovery - ckpt
+    exectime = total - recovery - ckpt - comm
     plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
     plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor=appconf["color"], hatch="*")
-    plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
+    plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], hatch="\\")
+    plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
     m += 1
   plt.xlabel(xlab)
   plt.xticks(np.arange(len(probs)), probs)
@@ -66,7 +70,7 @@ if __name__ == "__main__":
   with open(datapath, 'r') as file:
     plotdata = json.load(file)
 
-  plot_fig(plotdata, "Failure Probability", "Elapsed time (s)", figpath + "elapsed-time.png")
+  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time.png")
   
   
 

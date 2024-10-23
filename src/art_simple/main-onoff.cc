@@ -100,8 +100,8 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
 int main(int argc, char* argv[])
 {
 
-    if(argc != 10) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> <allow_restart> [veloc config]" << std::endl;
+    if(argc != 9) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> [veloc config]" << std::endl;
         return 1;
     }
 
@@ -114,8 +114,7 @@ int main(int argc, char* argv[])
     int beg_index = atoi(argv[5]);
     int nslices = atoi(argv[6]);
     float failure_prob = atof(argv[7]);
-    bool allow_restart = atoi(argv[8]) == 1 ? true : false;
-    const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
+    const char* check_point_config = (argc == 9) ? argv[8] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
 
@@ -260,9 +259,7 @@ int main(int argc, char* argv[])
     // Setup random number generation
     std::random_device rd;  // Seed generator
     std::mt19937 gen(rd()); // Mersenne Twister engine
-    std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
-    double task_stop_threshold = exp_dist(gen);
-    std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
+    std::bernoulli_distribution d(failure_prob); // Distribution for 0 and 1
 
     // std::vector<std::vector<int>> task_states = {
     //     {1, 0, 0, 1, 0, 0, 0, 1, 1, 1},
@@ -271,19 +268,29 @@ int main(int argc, char* argv[])
     //     {0, 1, 0, 1, 0, 0, 0, 1, 1, 0},
     //     {1, 0, 1, 0, 1, 1, 1, 0, 0, 1},
     // };
-    // std::vector<std::vector<int>> task_states = {
-    //     {1, 0, 1, 0, 0, 0, 0, 0, 0, 0},
-    //     {1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
-    //     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    //     {1, 0, 0, 0, 1, 0, 0, 0, 0, 0},
-    //     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    //     {1, 0, 0, 1, 0, 0, 0, 0, 0, 0},
-    //     {1, 0, 1, 0, 0, 0, 1, 0, 0, 0},
-    //     {1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
-    //     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    //     {1, 0, 0, 1, 0, 0, 0, 0, 0, 0}
-    // };
-    std::vector<int> task_state_history;
+     std::vector<std::vector<int>> task_states = {
+        {1, 0, 1, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 1, 0, 0, 0, 0, 0, 0},
+        {1, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 0, 0, 1, 0, 0, 0, 0, 0, 0}
+    };
+    // std::vector<int> task_state_history(num_outer_iter);
+    // std::string state_info = "[";
+    // for (int i = 0; i < num_outer_iter; ++i) {
+    //     task_state_history[i] = d(gen) ? 0 : 1;
+    //     if (id == mpi_root) {
+    //         task_state_history[i] = 1;
+    //     }
+    //     state_info += " " + std::to_string(i) + ": " + std::to_string(task_state_history[i]) + ", ";
+    // }
+    // state_info += "]";
+    // std::cout << "[Task-" << id << "]: State history: " << state_info << std::endl;
     
     if (id == mpi_root) {
         progress = ckpt->restart_test(ckpt_name, 0, id);
@@ -325,7 +332,6 @@ int main(int argc, char* argv[])
 
     double ckpt_time = 0;
     double recovery_time = 0;
-    double comm_time = 0;
     auto recon_start = std::chrono::high_resolution_clock::now();
 
     // run the reconstruction
@@ -334,7 +340,7 @@ int main(int argc, char* argv[])
         
         // MPI_Barrier(MPI_COMM_WORLD);
 
-        auto comm_start = std::chrono::high_resolution_clock::now();
+        auto recovery_start = std::chrono::high_resolution_clock::now();
 
         // Sync the task status across all tasks
         std::swap(active_tracker, prev_active_tracker);
@@ -366,28 +372,6 @@ int main(int argc, char* argv[])
                 active_tasks++;
             }
         }
-
-        if (active_tasks == 0  && allow_restart) {
-            // All tasks are stopped, restart the computation from beginning
-            
-            mpi_root = 0;
-            if (id == mpi_root) {
-                std::cout << "ALL TASKS HAVE STOPPED. RESTART ALL THE RECONSTRUCTION TASKS" << std::endl;
-            }
-            task_is_active = 1;
-            task_stop_threshold = exp_dist(gen);
-            std::cout << "Task[" << id << "] will stop in " << task_stop_threshold << " second(s)." << std::endl;
-            std::chrono::duration<double> recon_progress = std::chrono::high_resolution_clock::now() - recon_start;
-            task_stop_threshold += recon_progress.count();
-            
-            added_tasks.clear();
-            for (int i = 0; i < num_tasks; ++i) {
-                added_tasks.push_back(i);
-            }
-            removed_tasks.clear();
-        }
-
-        auto recovery_start = std::chrono::high_resolution_clock::now();
 
         if (!added_tasks.empty()) {
             if (id == mpi_root) {
@@ -717,10 +701,6 @@ int main(int argc, char* argv[])
         std::chrono::duration<double> recovery_elapsed_time = recovery_end - recovery_start;
         recovery_time += recovery_elapsed_time.count();
 
-        auto comm_end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> comm_elapsed_time = comm_end - comm_start;
-        comm_time += comm_elapsed_time.count();
-
         // Save progress with checkpoint
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
@@ -737,22 +717,12 @@ int main(int argc, char* argv[])
         ckpt_time += ckpt_elapsed_time.count();
 
         // Update state
-        // if (progress < task_states.size()) {
-        //     task_is_active = task_states[progress][id];
-        // }
+        if (progress < task_states.size()) {
+            task_is_active = task_states[progress][id];
+        }
         // if (progress < task_state_history.size()) {
         //     task_is_active = task_state_history[progress];
         // }
-        auto recon_progress = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed_time = recon_progress - recon_start;
-        if (elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
-            task_is_active = 0;
-            std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
-        }else{
-            task_is_active = 1;
-        }
-        task_state_history.push_back(task_is_active);
-
 
         // Do the reconstruction
         if (task_is_active && progress < num_outer_iter && num_rows > 0) {
@@ -766,14 +736,6 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "[Task " << id << "] Complete the reconstruction, waiting for other..." << std::endl;
-
-    std::string state_info = "[";
-    for (int i = 0; i < task_state_history.size(); ++i) {
-        state_info += " " + std::to_string(i) + ": " + std::to_string(task_state_history[i]) + ", ";
-    }
-    state_info += "]";
-    std::cout << "[Task-" << id << "]: State history: " << state_info << std::endl;
-    
 
     const char * img_name = "recon.h5";
     if (id == mpi_root) {
@@ -842,7 +804,6 @@ int main(int argc, char* argv[])
     if (id == mpi_root) {
         std::cout << "ELAPSED TIME: " << recon_elapsed.count() << " seconds" << std::endl;
         std::cout << "CHECKPOINTING TIME: " << ckpt_time << " seconds" << std::endl;
-        std::cout << "COMM TIME: " << comm_time << " seconds" << std::endl;
         std::cout << "RECOVERY TIME: " << recovery_time << " seconds" << std::endl;
     }
 
