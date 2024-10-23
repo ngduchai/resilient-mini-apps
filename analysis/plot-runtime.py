@@ -44,10 +44,14 @@ def plot_fig(data, xlab, ylab, figpath):
     comm = np.array(comm) - recovery
     total = np.array(total)
     exectime = total - recovery - ckpt - comm
-    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor=appconf["color"], hatch="//")
-    plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor=appconf["color"], hatch="*")
-    plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], hatch="\\")
-    plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
+    # plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="appconf["color"]", hatch="//")
+    # plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor=appconf["color"], hatch="*")
+    # plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], hatch="\\")
+    # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
+    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="green", hatch="//", label="Reconstruction")
+    plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
+    plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor="blue", hatch="\\", label="Sync")
+    plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor="purple", label=appconf["label"], hatch="||", "Recovery")
     m += 1
   plt.xlabel(xlab)
   plt.xticks(np.arange(len(probs)), probs)

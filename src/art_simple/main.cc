@@ -58,7 +58,7 @@ int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     return 0;
 }
 
-void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size, int &progress, int *num_ckpt, int &numrows, float *recon, int *row_index) {
+void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size, int &progress, int *num_ckpt, int &numrows, float *recon, int *row_index, bool exact_ver=false) {
     // ckpt->mem_protect(1, &numrows, 1, sizeof(int));
     // int v = ckpt->restart_test(name, progress, id);
     // std::cout << "Checkpoint: " << id << " -- v = " << v << std::endl;
@@ -87,7 +87,7 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
         if (loaded == false) {
             progress--;
         }
-    } while (loaded == false && progress >= 0);
+    } while (!exact_ver && loaded == false && progress >= 0);
     if (loaded == false) {
         numrows = 0;
     }
@@ -367,8 +367,11 @@ int main(int argc, char* argv[])
             }
         }
 
+        bool restarted = false;
         if (active_tasks == 0  && allow_restart) {
             // All tasks are stopped, restart the computation from beginning
+            MPI_Barrier(MPI_COMM_WORLD);
+            ckpt->checkpoint_wait();
             
             mpi_root = 0;
             if (id == mpi_root) {
@@ -376,15 +379,37 @@ int main(int argc, char* argv[])
             }
             task_is_active = 1;
             task_stop_threshold = exp_dist(gen);
-            std::cout << "Task[" << id << "] will stop in " << task_stop_threshold << " second(s)." << std::endl;
+            std::cout << "[Task" << id << "] will stop in " << task_stop_threshold << " second(s)." << std::endl;
             std::chrono::duration<double> recon_progress = std::chrono::high_resolution_clock::now() - recon_start;
             task_stop_threshold += recon_progress.count();
-            
+            num_rows = 0;
+
+            // Reload checkpoints
+            if (progress > 0) {
+                std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
+                num_rows = dy;
+                int v = progress-1;
+                recover(ckpt, id, ckpt_name, sinogram_size, v, &num_ckpt, num_rows, local_recon, row_indexes, true);
+                for (int i = 0; i < num_rows; ++i) {
+                    memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
+                }
+                std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << id << ", version: " << v << " num_row: " << num_rows << " num_ckpt: " << num_ckpt << std::endl;
+                MPI_Bcast(&num_ckpt, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+                progress--;
+            }
+
+            int * num_row_trackers = new int [num_tasks];
+            MPI_Allgather(&num_rows, 1, MPI_INT, num_row_trackers, 1, MPI_INT, MPI_COMM_WORLD);
             added_tasks.clear();
             for (int i = 0; i < num_tasks; ++i) {
-                added_tasks.push_back(i);
+                if (num_row_trackers[i] == 0) {
+                    added_tasks.push_back(i);
+                }
             }
             removed_tasks.clear();
+            active_tasks = num_tasks;
+            delete [] num_row_trackers;
+            restarted = true;
         }
 
         auto recovery_start = std::chrono::high_resolution_clock::now();
@@ -724,7 +749,7 @@ int main(int argc, char* argv[])
         // Save progress with checkpoint
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
-        if (task_is_active) {
+        if (task_is_active && !restarted) {
             ckpt->checkpoint_wait();
             if (!ckpt->checkpoint(ckpt_name, progress)) {
                 std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
@@ -745,7 +770,7 @@ int main(int argc, char* argv[])
         // }
         auto recon_progress = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed_time = recon_progress - recon_start;
-        if (elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+        if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
             task_is_active = 0;
             std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
         }else{
@@ -810,7 +835,7 @@ int main(int argc, char* argv[])
     // MPI_Gather(row_indexes, num_rows, MPI_INT, tmp_row_indexes, num_rows, MPI_INT, mpi_root, MPI_COMM_WORLD);
     if (id == mpi_root) {
         for (int i = 0; i < dy; ++i) {
-            std::cout << "Write data " << tmp_row_indexes[i] << " <--" << i << std::endl;
+            std::cout << "Write data " << tmp_row_indexes[i] << " <-- " << i << std::endl;
             memcpy(recon + tmp_row_indexes[i]*sinogram_size, tmp_recon + i*sinogram_size, sizeof(float)*sinogram_size);
         }
         delete [] tmp_recon;
