@@ -328,8 +328,6 @@ int main(int argc, char* argv[])
     double comm_time = 0;
     auto recon_start = std::chrono::high_resolution_clock::now();
 
-    std::cout << "[Task-" << id << "] starting reconstruction" << std::endl;
-
     // run the reconstruction
     while (progress < num_outer_iter+1) {
         // We need one extra iteration to ensure all rows are sync with the expected number of iterations
