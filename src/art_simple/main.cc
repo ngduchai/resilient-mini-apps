@@ -751,11 +751,12 @@ int main(int argc, char* argv[])
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
         if (task_is_active && !restarted) {
-            ckpt->checkpoint_wait();
+            // ckpt->checkpoint_wait();
             if (!ckpt->checkpoint(ckpt_name, progress)) {
                 std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
                 throw std::runtime_error("Checkpointing failured");
             }
+            ckpt->checkpoint_wait();
             std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
         }
         auto ckpt_end = std::chrono::high_resolution_clock::now();
