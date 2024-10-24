@@ -369,7 +369,11 @@ int main(int argc, char* argv[])
         }
 
         bool restarted = false;
-        if (active_tasks == 0  && allow_restart) {
+        if (active_tasks == 0) {
+            if (allow_restart == false) {
+                std::cerr << "All tasks failed, stop the reconstruction" << std::endl;
+                return 1;
+            }
             // All tasks are stopped, restart the computation from beginning
             MPI_Barrier(MPI_COMM_WORLD);
             ckpt->checkpoint_wait();
