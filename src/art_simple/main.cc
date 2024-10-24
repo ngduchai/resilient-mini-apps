@@ -799,6 +799,16 @@ int main(int argc, char* argv[])
     state_info += "]";
     std::cout << "[Task-" << id << "]: State history: " << state_info << std::endl;
     
+    auto recon_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> recon_elapsed = recon_end - recon_start;
+    double recon_time = recon_elapsed.count();
+    
+    double total_recon_time, total_comm_time, total_ckpt_time, total_recovery_time;
+    MPI_Reduce(&recon_time, &total_recon_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
+    MPI_Reduce(&comm_time, &total_comm_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
+    MPI_Reduce(&ckpt_time, &total_ckpt_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
+    MPI_Reduce(&recovery_time, &total_recovery_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
+
 
     const char * img_name = "recon.h5";
     if (id == mpi_root) {
@@ -861,14 +871,13 @@ int main(int argc, char* argv[])
 
     }
 
-    auto recon_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> recon_elapsed = recon_end - recon_start;
+
 
     if (id == mpi_root) {
-        std::cout << "ELAPSED TIME: " << recon_elapsed.count() << " seconds" << std::endl;
-        std::cout << "CHECKPOINTING TIME: " << ckpt_time << " seconds" << std::endl;
-        std::cout << "COMM TIME: " << comm_time << " seconds" << std::endl;
-        std::cout << "RECOVERY TIME: " << recovery_time << " seconds" << std::endl;
+        std::cout << "ELAPSED TIME: " << total_recon_time/num_tasks << " seconds" << std::endl;
+        std::cout << "CHECKPOINTING TIME: " << total_ckpt_time/num_tasks << " seconds" << std::endl;
+        std::cout << "COMM TIME: " << total_comm_time/num_tasks << " seconds" << std::endl;
+        std::cout << "RECOVERY TIME: " << total_recovery_time/num_tasks << " seconds" << std::endl;
     }
 
 

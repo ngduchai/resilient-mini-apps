@@ -41,7 +41,8 @@ def plot_fig(data, xlab, ylab, figpath):
     x = np.arange(len(prob))
     ckpt = np.array(ckpt)
     recovery = np.array(recovery)
-    comm = np.array(comm) - recovery
+    # comm = np.array(comm) - recovery
+    comm = np.array(comm)
     total = np.array(total)
     exectime = total - recovery - ckpt - comm
     # plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="appconf["color"]", hatch="//")
@@ -51,7 +52,7 @@ def plot_fig(data, xlab, ylab, figpath):
     plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="green", hatch="//", label="Reconstruction")
     plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
     plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor="blue", hatch="\\", label="Sync")
-    plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor="purple", label=appconf["label"], hatch="||", "Recovery")
+    # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor="purple", hatch="||", label="Recovery")
     m += 1
   plt.xlabel(xlab)
   plt.xticks(np.arange(len(probs)), probs)
@@ -74,7 +75,8 @@ if __name__ == "__main__":
   with open(datapath, 'r') as file:
     plotdata = json.load(file)
 
-  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time.png")
+  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time-no-retry.png")
+  plot_fig(plotdata["with-retries"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time-with-retry.png")
   
   
 
