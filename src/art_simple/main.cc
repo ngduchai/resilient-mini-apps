@@ -82,6 +82,10 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
     ckpt->mem_protect(1, &numrows, 1, sizeof(int));
     ckpt->mem_protect(2, recon, numrows*sinogram_size, sizeof(float));
     ckpt->mem_protect(3, row_index, numrows, sizeof(int));
+    
+    // if (ckpt->restart(name, progress, id) == false) {
+    //     numrows = 0;
+    // }
     bool loaded = false;
     do {
         loaded = ckpt->restart(name, progress, id);
@@ -92,10 +96,6 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
     if (loaded == false) {
         numrows = 0;
     }
-    // if (ckpt->restart(name, progress, id) == false) {
-    //     numrows = 0;
-    // }
-
 }
 
 int main(int argc, char* argv[])
@@ -890,6 +890,7 @@ int main(int argc, char* argv[])
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
+            ofile << "\"filename\" : " << filename << "," << std::endl;
             ofile << "\"ngridx\" : " << ngridx << "," << std::endl;
             ofile << "\"ngridy\" : " << ngridy << "," << std::endl;
             ofile << "\"theta\" : " << dt << "," << std::endl;
