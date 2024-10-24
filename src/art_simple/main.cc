@@ -14,6 +14,7 @@
 #include <string.h>
 #include <random>
 #include <chrono>
+#include <fstream>
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
@@ -874,6 +875,31 @@ int main(int argc, char* argv[])
 
 
     if (id == mpi_root) {
+        // Dump the reconsruction configuration and timing to a file
+        std::string filePath = "execinfo.json";
+        std::ofstream ofile;
+        ofile.open(filePath, std::ios::app);
+
+        if (ofile.is_open()) {
+            ofile << "{" << std::endl;
+            ofile << "\"prob\" : " << failure_prob << "," << std::endl;
+            ofile << "\"nslices\" : " << nslices << "," << std::endl;
+            ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
+            ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
+            ofile << "\"ngridx\" : " << ngridx << "," << std::endl;
+            ofile << "\"ngridy\" : " << ngridy << "," << std::endl;
+            ofile << "\"theta\" : " << dt << "," << std::endl;
+            ofile << "\"total\" : " << total_recon_time/num_tasks << "," << std::endl;
+            ofile << "\"ckpt\" : " << total_ckpt_time/num_tasks << "," << std::endl;
+            ofile << "\"comm\" : " << total_comm_time/num_tasks << "," << std::endl;
+            ofile << "\"recover\" : " << total_recovery_time/num_tasks << "," << std::endl;
+            ofile << "}," << std::endl;
+        }else{
+            std::cerr << "Cannot save the experiment configuration and timing" << std::endl;
+        }
+
+        ofile.close();
+
         std::cout << "ELAPSED TIME: " << total_recon_time/num_tasks << " seconds" << std::endl;
         std::cout << "CHECKPOINTING TIME: " << total_ckpt_time/num_tasks << " seconds" << std::endl;
         std::cout << "COMM TIME: " << total_comm_time/num_tasks << " seconds" << std::endl;
