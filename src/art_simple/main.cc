@@ -670,7 +670,7 @@ int main(int argc, char* argv[])
                 int *tmp_progress = new int[recovered_size];
 
                 while (recovered_size > 0) {
-                    std::cout << "[task-" << id << "]: Sync " << recovered_size << " rows from checkpoints" << std::endl;
+                    std::cout << "[Task-" << id << "]: Sync " << recovered_size << " rows from checkpoints" << std::endl;
                     int remain_size = 0;
                     for (int i = 0; i < recovered_size; ++i) {
                         if (local_ckpt_progress[i] == progress) {
@@ -679,7 +679,7 @@ int main(int argc, char* argv[])
                             memcpy(local_data + num_rows*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
                             num_rows++;
                         }else{
-                            std::cout << "Row #" << local_recovered_row_indexes[i] << " need to be sync" << std::endl;
+                            std::cout << "[Task-" << id << "] Row #" << local_recovered_row_indexes[i] << " need to be sync" << std::endl;
                             memcpy(tmp_recon + remain_size*sinogram_size, local_recovered_recon + i*sinogram_size, sizeof(float)*sinogram_size);
                             tmp_indexes[remain_size] = local_recovered_row_indexes[i];
                             memcpy(tmp_data + remain_size*dt*dx, data_swap+local_recovered_row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
