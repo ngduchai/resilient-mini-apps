@@ -890,7 +890,7 @@ int main(int argc, char* argv[])
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
-            ofile << "\"filename\" : " << filename << "," << std::endl;
+            ofile << "\"filename\" : \"" << filename << "\"," << std::endl;
             ofile << "\"ngridx\" : " << ngridx << "," << std::endl;
             ofile << "\"ngridy\" : " << ngridy << "," << std::endl;
             ofile << "\"theta\" : " << dt << "," << std::endl;
