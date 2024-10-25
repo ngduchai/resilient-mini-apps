@@ -194,7 +194,7 @@ int main(int argc, char* argv[])
 
     // reconstruct using art
     int dt = dims[0];
-    int dy = dims[1];
+    int dy = std::max((hsize_t)nslices, dims[1]);
     int dx = dims[2];
     int ngridx = dx;
     int ngridy = dx;
