@@ -75,8 +75,8 @@ if __name__ == "__main__":
   with open(datapath, 'r') as file:
     plotdata = json.load(file)
 
-  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time-no-retry.png")
-  plot_fig(plotdata["with-retries"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "elapsed-time-with-retry.png")
+  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "/elapsed-time-no-retry.png")
+  plot_fig(plotdata["with-retries"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "/elapsed-time-with-retry.png")
   
   
 

@@ -351,7 +351,9 @@ int main(int argc, char* argv[])
     double ckpt_time = 0;
     double recovery_time = 0;
     double comm_time = 0;
+    double exec_time = 0;
     auto recon_start = std::chrono::high_resolution_clock::now();
+    
 
     // run the reconstruction
     while (progress < num_outer_iter+1) {
@@ -797,8 +799,8 @@ int main(int argc, char* argv[])
         // if (progress < task_state_history.size()) {
         //     task_is_active = task_state_history[progress];
         // }
-        auto recon_progress = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed_time = recon_progress - recon_start;
+        auto exec_start = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_time = exec_start - recon_start;
         if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
             task_is_active = 0;
             std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
@@ -814,6 +816,10 @@ int main(int argc, char* argv[])
             // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
             art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
         }
+
+        auto exec_end = std::chrono::high_resolution_clock::now();
+        elapsed_time = exec_end - exec_start;
+        exec_time += elapsed_time.count();
 
         progress++;
 
@@ -832,8 +838,9 @@ int main(int argc, char* argv[])
     std::chrono::duration<double> recon_elapsed = recon_end - recon_start;
     double recon_time = recon_elapsed.count();
     
-    double total_recon_time, total_comm_time, total_ckpt_time, total_recovery_time;
+    double total_recon_time, total_exec_time, total_comm_time, total_ckpt_time, total_recovery_time;
     MPI_Reduce(&recon_time, &total_recon_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
+    MPI_Reduce(&exec_time, &total_exec_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
     MPI_Reduce(&comm_time, &total_comm_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
     MPI_Reduce(&ckpt_time, &total_ckpt_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
     MPI_Reduce(&recovery_time, &total_recovery_time, 1, MPI_DOUBLE, MPI_SUM, mpi_root, MPI_COMM_WORLD);
@@ -919,9 +926,10 @@ int main(int argc, char* argv[])
             ofile << "\"ngridy\" : " << ngridy << "," << std::endl;
             ofile << "\"theta\" : " << dt << "," << std::endl;
             ofile << "\"total\" : " << total_recon_time/num_tasks << "," << std::endl;
+            ofile << "\"exec\" : " << total_exec_time/num_tasks << "," << std::endl;
             ofile << "\"ckpt\" : " << total_ckpt_time/num_tasks << "," << std::endl;
             ofile << "\"comm\" : " << total_comm_time/num_tasks << "," << std::endl;
-            ofile << "\"recover\" : " << total_recovery_time/num_tasks << "," << std::endl;
+            ofile << "\"recover\" : " << total_recovery_time/num_tasks << std::endl;
             ofile << "}," << std::endl;
         }else{
             std::cerr << "Cannot save the experiment configuration and timing" << std::endl;
@@ -930,6 +938,7 @@ int main(int argc, char* argv[])
         ofile.close();
 
         std::cout << "ELAPSED TIME: " << total_recon_time/num_tasks << " seconds" << std::endl;
+        std::cout << "EXEC TIME: " << total_exec_time/num_tasks << " seconds" << std::endl;
         std::cout << "CHECKPOINTING TIME: " << total_ckpt_time/num_tasks << " seconds" << std::endl;
         std::cout << "COMM TIME: " << total_comm_time/num_tasks << " seconds" << std::endl;
         std::cout << "RECOVERY TIME: " << total_recovery_time/num_tasks << " seconds" << std::endl;
