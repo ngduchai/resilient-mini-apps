@@ -141,11 +141,35 @@ int main(int argc, char* argv[])
     hsize_t dims[3];
     H5Sget_simple_extent_dims(dataspace_id, dims, NULL);
     // std::cout << "Data dimensions: " << dims[0] << " x " << dims[1] << " x " << dims[2] << std::endl;
-    float* data = new float[dims[0]*dims[1]*dims[2]];
-    H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+    
+    float* data = nullptr;
+    if (dims[1] <= nslices) {
+        // We will process the whole dataset so just read the whole file
+        data  = new float[dims[0]*dims[1]*dims[2]]; 
+        H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
 
-    //close the dataset
-    H5Dclose(dataset_id);
+        //close the dataset
+        H5Dclose(dataset_id);
+    }else{
+        // We just process a part of the dataset, so we will read the region defined by [begining_sino, beginning_sino+nslices)
+        hsize_t start[3] = {0, beg_index, 0};
+        hsize_t count[3] = {dims[0], nslices, dims[2]};
+        H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, start, NULL, count, NULL);
+
+        // Create a memory dataspace
+        hsize_t mem_dims[3] = {dims[0], nslices, dims[2]};
+        hid_t memspace_id = H5Screate_simple(3, mem_dims, NULL);
+
+        // Allocate memory for the hyperslab
+        data = new float[dims[0] * nslices * dims[2]];
+
+        // Read the data from the hyperslab
+        H5Dread(dataset_id, H5T_NATIVE_FLOAT, memspace_id, dataspace_id, H5P_DEFAULT, data);
+
+        //close the dataset
+        H5Dclose(dataset_id);
+        H5Sclose(memspace_id);
+    }
 
 
     // read the theta
