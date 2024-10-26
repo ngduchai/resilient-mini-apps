@@ -37,7 +37,7 @@ def plot_fig(data, xlab, ylab, figpath):
       comm.append(info["comm"])
       total.append(info["total"])
     if probs == None:
-      probs = prob
+      probs = 1/np.array(prob)
     x = np.arange(len(prob))
     ckpt = np.array(ckpt)
     recovery = np.array(recovery)
@@ -49,7 +49,7 @@ def plot_fig(data, xlab, ylab, figpath):
     # plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor=appconf["color"], hatch="*")
     # plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], hatch="\\")
     # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
-    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="green", hatch="//", label="Reconstruction")
+    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="green", hatch="//", label="Data Processing")
     plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
     plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor="blue", hatch="\\", label="Sync")
     # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor="purple", hatch="||", label="Recovery")
@@ -61,7 +61,8 @@ def plot_fig(data, xlab, ylab, figpath):
   
   plt.legend(loc="best")
   plt.tight_layout()
-  plt.savefig(figpath)
+  plt.savefig(figpath + ".png")
+  plt.savefig(figpath + ".pdf")
 
 if __name__ == "__main__":
   
@@ -75,8 +76,13 @@ if __name__ == "__main__":
   with open(datapath, 'r') as file:
     plotdata = json.load(file)
 
-  plot_fig(plotdata["exp_failure"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "/elapsed-time-no-retry.png")
-  plot_fig(plotdata["with-retries"], "Failure Frequency (per sec)", "Elapsed time (s)", figpath + "/elapsed-time-with-retry.png")
+  plt.rcParams['axes.labelsize'] = 16     # X and Y labels font size
+  plt.rcParams['xtick.labelsize'] = 16    # X-axis tick labels font size
+  plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
+  plt.rcParams['legend.fontsize'] = 16
+
+  plot_fig(plotdata["exp_failure"], "Mean Time to Failure (sec)", "Elapsed time (s)", figpath + "/elapsed-time-no-retry")
+  plot_fig(plotdata["with-retries"], "Mean Time to Failure (sec)", "Elapsed time (s)", figpath + "/elapsed-time-with-retry")
   
   
 
