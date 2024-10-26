@@ -870,7 +870,7 @@ int main(int argc, char* argv[])
 
     if (id == mpi_root) {
         // Dump the reconsruction configuration and timing to a file
-        std::string filePath = "execinfo.json";
+        std::string filePath = "execinfo-failure-impact.json";
         std::ofstream ofile;
         ofile.open(filePath, std::ios::app);
 
