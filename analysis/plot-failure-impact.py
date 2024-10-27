@@ -5,64 +5,81 @@ import numpy as np
 import sys
 import json
 
+import seaborn as sns
+
 import pickle
 
 import matplotlib.pyplot as plt
 
 import os
 
+def make_index(data):
+  index = {}
+  for i in range(len(data)):
+    index[data[i]] = i
+  return index
 
-# Making a plot showing the checkpoint overhead varying input data size
-def plot_fig(data, xlab, ylab, figpath):
-  width = 0.15
+def draw_heatmap(data, xticks, yticks, figpath):
   plt.figure()
-  lapp = None
-  for approach in data:
-    if lapp == None or len(data[approach]["elapsed-time"]) > len(data[lapp]["elapsed-time"]):
-      lapp = approach
-  probs = None
-  m = 0
-  for approach in data:
-    appconf = data[approach]
-    appdata = data[approach]["elapsed-time"]
-    prob = []
-    ckpt = []
-    comm = []
-    recovery = []
-    total = []
-    for info in appdata:
-      prob.append(info["prob"])
-      ckpt.append(info["ckpt"])
-      recovery.append(info["recover"])
-      comm.append(info["comm"])
-      total.append(info["total"])
-    if probs == None:
-      probs = 1/np.array(prob)
-    x = np.arange(len(prob))
-    ckpt = np.array(ckpt)
-    recovery = np.array(recovery)
-    # comm = np.array(comm) - recovery
-    comm = np.array(comm)
-    total = np.array(total)
-    exectime = total - recovery - ckpt - comm
-    # plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="appconf["color"]", hatch="//")
-    # plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor=appconf["color"], hatch="*")
-    # plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor=appconf["color"], hatch="\\")
-    # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor=appconf["color"], label=appconf["label"], hatch="||")
-    plt.bar(x + width*m, exectime, width, facecolor="none", edgecolor="green", hatch="//", label="Data Processing")
-    plt.bar(x + width*m, ckpt, width, bottom=exectime, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
-    plt.bar(x + width*m, comm, width, bottom=exectime+ckpt, facecolor="none", edgecolor="blue", hatch="\\", label="Sync")
-    # plt.bar(x + width*m, recovery, width, bottom=exectime+ckpt+comm, facecolor="none", edgecolor="purple", hatch="||", label="Recovery")
-    m += 1
-  plt.xlabel(xlab)
-  plt.xticks(np.arange(len(probs)), probs)
-  plt.ylabel(ylab)
-  # plt.yscale("log")
-  
-  plt.legend(loc="best")
+  # plt.imshow(data, cmap="autumn", vmin=0, vmax=100, extent=[0, 8, 0, 8])
+  # for i in range(8): 
+  #   for j in range(8): 
+  #       plt.annotate(str(data[i][j]), xy=(j+0.5, i+0.5), ha='center', va='center', color='white')
+  # plt.colorbar()
+
+  # plt.xticks(range(len(xticks)), xticks)
+  # plt.yticks(range(len(yticks)), yticks)
+
+  # plt.xlabel("Time of Failure")
+  # plt.ylabel("Fraction of Failure Processes")
+
+  hm = sns.heatmap(
+    data=data,
+    annot=True,
+    fmt=".2f",
+    cmap="cool",
+    xticklabels=xticks,
+    yticklabels=yticks)
+
+  plt.xlabel("Progress when failures happen")
+  plt.ylabel("Fraction of failure processes")
+
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
+
+
+# Making a plot showing the checkpoint overhead varying input data size
+def plot_fig(data, baseline, figpath):
+  # failure_iters = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+  # failure_iter_ticklabels = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0]
+  # failure_ratios = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  failure_iters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  failure_iter_ticklabels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  failure_ratios = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+  iter_indexes = make_index(failure_iters)
+  ratio_indxes = make_index(failure_ratios)
+
+  ckpt_times = np.zeros([len(failure_ratios), len(failure_iters)])
+  sync_times = np.zeros([len(failure_ratios), len(failure_iters)])
+  compute_times = np.zeros([len(failure_ratios), len(failure_iters)])
+  total_times = np.zeros([len(failure_ratios), len(failure_iters)])
+
+  for exp in data:
+    fiter = iter_indexes[exp["failure_iter"]]
+    fratio = ratio_indxes[exp["failure_ratio"]]
+    ckpt_times[fratio][fiter] = exp["ckpt"] / baseline["exec"]
+    sync_times[fratio][fiter] = exp["comm"] / baseline["exec"]
+    compute_times[fratio][fiter] = (exp["exec"] - baseline["exec"]) / baseline["exec"]
+    total_times[fratio][fiter] = (exp["total"] - baseline["exec"]) / baseline["exec"]
+
+  
+  draw_heatmap(ckpt_times, failure_iter_ticklabels, failure_ratios, figpath + "/ckpt_overhead")
+  draw_heatmap(sync_times, failure_iter_ticklabels, failure_ratios, figpath + "/sync_overhead")
+  draw_heatmap(compute_times, failure_iter_ticklabels, failure_ratios, figpath + "/exec_overhead")
+  draw_heatmap(total_times, failure_iter_ticklabels, failure_ratios, figpath + "/total_overhead")
+
+
 
 if __name__ == "__main__":
   
@@ -81,8 +98,9 @@ if __name__ == "__main__":
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
   plt.rcParams['legend.fontsize'] = 16
 
-  plot_fig(plotdata["exp_failure"], "Mean Time to Failure (sec)", "Elapsed time (s)", figpath + "/elapsed-time-no-retry")
-  plot_fig(plotdata["with-retries"], "Mean Time to Failure (sec)", "Elapsed time (s)", figpath + "/elapsed-time-with-retry")
+  baseline = plotdata["baseline"]
+
+  plot_fig(plotdata["exp"], baseline, figpath)
   
   
 

@@ -780,6 +780,7 @@ int main(int argc, char* argv[])
             // std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
         }
         task_state_history.push_back(task_is_active);
+        exec_start = std::chrono::high_resolution_clock::now();
 
 
         // Do the reconstruction
