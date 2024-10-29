@@ -15,7 +15,7 @@ import os
 # Making a plot showing the checkpoint overhead varying input data size
 def plot_fig(data, xlab, ylab, figpath):
   width = 0.15
-  plt.figure()
+  plt.figure(figsize=(10, 6))
   lapp = None
   for approach in data:
     if lapp == None or len(data[approach]["elapsed-time"]) > len(data[lapp]["elapsed-time"]):

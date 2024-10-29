@@ -70,7 +70,8 @@ def plot_fig(data, baseline, figpath):
     fratio = ratio_indxes[exp["failure_ratio"]]
     ckpt_times[fratio][fiter] = exp["ckpt"] / baseline["exec"]
     sync_times[fratio][fiter] = exp["comm"] / baseline["exec"]
-    compute_times[fratio][fiter] = (exp["exec"] - baseline["exec"]) / baseline["exec"]
+    # compute_times[fratio][fiter] = (exp["exec"] - baseline["exec"]) / baseline["exec"]
+    compute_times[fratio][fiter] = (exp["total"] - exp["ckpt"] - exp["comm"] - baseline["exec"]) / baseline["exec"]
     total_times[fratio][fiter] = (exp["total"] - baseline["exec"]) / baseline["exec"]
 
   
