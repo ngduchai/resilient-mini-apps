@@ -952,15 +952,15 @@ int main(int argc, char* argv[])
         
         exec_start = std::chrono::high_resolution_clock::now();
         elapsed_time = exec_start - recon_start;
-        // if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
-        //     task_is_active = 0;
-        //     std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
-        // }else{
-        //     task_is_active = 1;
-        // }
-        if (progress == 0 && id > 8) {
+        if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
             task_is_active = 0;
+            std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
+        }else{
+            task_is_active = 1;
         }
+        // if (progress == 0 && id > 8) {
+        //     task_is_active = 0;
+        // }
         task_state_history.push_back(task_is_active);
 
         // Adjust number of slices to be computed
