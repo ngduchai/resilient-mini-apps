@@ -38,17 +38,18 @@ if __name__ == "__main__":
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
   plt.rcParams['legend.fontsize'] = 16
 
-  mttf = 0.000001
+  # mttf = 5.55555556e-8 # 1 per 5k hours
+  mttf = 1/(30*24*3600) # Assume a process can run for 1 month without failure
   resolutions = ["640x640", "2000x2000"]
   per_slice_runtime = {
     "640x640" : 6,
     "2000x2000" : 58.59375
   }
-  num_iter = 20
+  num_iter = 200
   num_slices = 2048
 
   # num_processes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
-  num_processes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+  num_processes = [1, 4, 16, 64, 256, 1024]
 
   serial_runtimes = {}
   exp_runtimes = {}
@@ -73,21 +74,23 @@ if __name__ == "__main__":
 
   width = 0.15
   plt.figure()
-  m = 0
+  m = -0.5
   x = np.array(range(len(num_processes)))
   for resolution in resolutions:
     # plt.bar(x + width*m, exp_runtimes[resolution], width, facecolor="none", edgecolor=colors[resolution], hatch="//", label=resolution + " (expected)")
     # plt.plot(x, ideal_runtimes[resolution], color=colors[resolution], label=resolution + " (ideal)")
     plt.bar(x + width*m, exp_runtimes[resolution], width, facecolor="none", edgecolor=colors[resolution], hatch="//", label=resolution)
     m += 1
-  plt.plot(x, ideal_runtimes[resolution], color="green", label="Ideal")
+  plt.plot(x, ideal_runtimes[resolution], color="green", marker="o", label="Ideal")
   plt.xlabel("Number of processes")
   plt.xticks(x, num_processes)
   plt.ylabel("Normalized Reconstruction Time")
   plt.yscale("log")
-  # plt.ylim(0, 31536000) # A year
-  
-  plt.legend(loc="best")
+  plt.grid(which='major', color='black', linestyle='-', zorder=-1)   # Major grid
+  plt.grid(which='minor', color='gray', linestyle='--', linewidth=0.5, zorder=-1)   # Minor grid
+
+
+  plt.legend(loc="lower left")
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
