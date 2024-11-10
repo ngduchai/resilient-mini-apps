@@ -356,6 +356,10 @@ int main(int argc, char* argv[])
     auto exec_start = std::chrono::high_resolution_clock::now();
     auto exec_end = std::chrono::high_resolution_clock::now();
 
+    int recovered_rb_rows = 0;
+    bool recovered_from_ckpt = false;
+    std::vector<int> added_tasks, removed_tasks;
+
     // run the reconstruction
     while (progress < num_outer_iter+1) {
         // We need one extra iteration to ensure all rows are sync with the expected number of iterations
@@ -376,7 +380,10 @@ int main(int argc, char* argv[])
         auto comm_start = std::chrono::high_resolution_clock::now();
         
         // Check for new and old tasks
-        std::vector<int> added_tasks, removed_tasks;
+        added_tasks.clear();
+        if (!recovered_from_ckpt) {
+            removed_tasks.clear();
+        }
         active_tasks = 0;
         int task_index = 0;
         for (int j = 0; j < tracker_size; ++j) {
@@ -594,11 +601,14 @@ int main(int argc, char* argv[])
             }
         }
 
+        recovered_from_ckpt = false;
+        recovered_rb_rows = 0;
         if (!removed_tasks.empty()) {
             // Some tasks fails, recover their progress from checkpoints
             if (id == mpi_root) {
                 std::cout << "Found " << removed_tasks.size() << " task(s) stop working, start recovery..." << std::endl;
             }
+            recovered_from_ckpt = true;
             int recovered_size = 0;
             float * recovered_recon = nullptr;
             int * recovered_row_indexes = nullptr;
@@ -708,6 +718,7 @@ int main(int argc, char* argv[])
                 float * tmp_data = new float[recovered_size*dx*dt];
                 int *tmp_progress = new int[recovered_size];
 
+                recovered_rb_rows = recovered_size;
                 while (recovered_size > 0) {
                     std::cout << "[Task-" << id << "]: Sync " << recovered_size << " rows from checkpoints" << std::endl;
                     int remain_size = 0;
@@ -786,6 +797,41 @@ int main(int argc, char* argv[])
         std::chrono::duration<double> comm_elapsed_time = comm_end - comm_start;
         comm_time += comm_elapsed_time.count();
 
+        // Update state
+        // if (progress < task_states.size()) {
+        //     task_is_active = task_states[progress][id];
+        // }
+        // if (progress < task_state_history.size()) {
+        //     task_is_active = task_state_history[progress];
+        // }
+
+        // Sync state
+        if (recovered_from_ckpt) {
+            exec_start = std::chrono::high_resolution_clock::now();
+            elapsed_time = exec_start - recon_start;
+            if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+                if (task_is_active == 1) {
+                    std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
+                }
+                task_is_active = 0;
+            }else{
+                task_is_active = 1;
+            }
+            task_state_history.push_back(task_is_active);
+
+            int remaining_active = 0;
+            MPI_Allreduce(&task_is_active, &remaining_active, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            if (remaining_active != active_tasks) {
+                if (id == mpi_root) {
+                    std::cout << "[Task-" << id << "]: Detect failure during recovery, reloading checkpoints..." << std::endl;
+                }
+                if (num_rows > 0) {
+                    num_rows -= recovered_rb_rows;
+                }
+                continue;
+            }
+        }
+
         // Save progress with checkpoint
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
@@ -801,22 +847,21 @@ int main(int argc, char* argv[])
         std::chrono::duration<double> ckpt_elapsed_time = ckpt_end - ckpt_start;
         ckpt_time += ckpt_elapsed_time.count();
 
-        // Update state
-        // if (progress < task_states.size()) {
-        //     task_is_active = task_states[progress][id];
-        // }
-        // if (progress < task_state_history.size()) {
-        //     task_is_active = task_state_history[progress];
-        // }
-        exec_start = std::chrono::high_resolution_clock::now();
-        elapsed_time = exec_start - recon_start;
-        if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
-            task_is_active = 0;
-            std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
-        }else{
-            task_is_active = 1;
+        if (!recovered_from_ckpt) {
+            exec_start = std::chrono::high_resolution_clock::now();
+            elapsed_time = exec_start - recon_start;
+            if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+                if (task_is_active == 1) {
+                    std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
+                }
+                task_is_active = 0;
+            }else{
+                task_is_active = 1;
+            }
+            task_state_history.push_back(task_is_active);
         }
-        task_state_history.push_back(task_is_active);
+
+        recovered_from_ckpt = false;
 
 
         // Do the reconstruction
