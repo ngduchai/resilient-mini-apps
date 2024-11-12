@@ -651,6 +651,7 @@ int main(int argc, char* argv[])
                 // std::cout << "Shifting slices to normal tasks: " << i << " " << j  << std::endl;
                 // Shift slices among tasks if there are still overloaded tasks
                 // int k = 0;
+                // int transfer_limit = (remain_load-1) / active_tasks + 1;
                 int transfer_limit = (remain_load-1) / active_tasks + 1;
                 std::cout << "[Task-" << id << "]: Remain total_overload: " << remain_load << ". Spread them among tasks. Dynamic Redistribution transfer_limit: " << transfer_limit << std::endl;
                 while (j > i && collected_loaddiff[ld_indexes[j]] > 0) {
@@ -661,8 +662,15 @@ int main(int argc, char* argv[])
                         // do {
                         //     k = (k+1) % num_tasks;
                         // } while (active_tracker[k] != 1);
+                        int numtry = 0;
                         while (active_tracker[k] != 1 || transferred_rows[k] >= transfer_limit) {
                             k = (k+1) % num_tasks;
+                            numtry++;
+                            // if we all tasks meet the transfer limit yet there are data to be moved,
+                            // then increase the transfer limit
+                            if (numtry > num_tasks) {
+                                transfer_limit++;
+                            }
                         }
                         std::cout << "Tranfer 1 row from Task #" << ld_indexes[j] << " to Task #" << k << std::endl;
                         transferred_rows[k]++;
