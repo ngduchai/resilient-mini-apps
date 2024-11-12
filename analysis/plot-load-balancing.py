@@ -37,7 +37,7 @@ if __name__ == "__main__":
       nprocs.add(nps)
       total_times[approach][nps] = info["total"]
   
-  nprocs = sorted(list(nprocs))
+  nprocs = sorted(list(nprocs), reverse=True)
   plot_total_times = {}
   for approach in plotdata:
     plot_times = []
@@ -58,16 +58,17 @@ if __name__ == "__main__":
   width = 0.15
   x = np.arange(len(nprocs))
   m=0
-  for approach in plotdata:
+  approaches = ["static"]
+  for approach in approaches:
     print(plot_total_times[approach])
     plt.bar(x + width*m, plot_total_times[approach], width, facecolor="none", edgecolor=plotdata[approach]["color"], hatch="//", label=plotdata[approach]["label"])
     m += 1
-  plt.xlabel("# processes")
+  plt.xlabel("# Remaining Processes")
   plt.xticks(x, nprocs)
   plt.ylabel("Elapsed time (s)")
   # plt.yscale("log")
   
-  plt.legend(loc="best")
+  # plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath + "/load-balancing-scaling.png")
   plt.savefig(figpath + "/load-balancing-scaling.pdf")

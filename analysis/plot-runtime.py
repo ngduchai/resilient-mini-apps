@@ -29,6 +29,22 @@ def exp_no_resilient_runtime(lamb, num_processes, runtime):
   exp_runtime = runtime + (1 - reconstruction_success_prob)/reconstruction_success_prob*fail_runtime
   return exp_runtime
 
+def exp_no_resilient_resume_runtime(lamb, num_processes, runtime):
+  if lamb == 0:
+    return runtime
+  # Probability that a single worker/process complete before failure
+  #   = Prb[failure interval > runtime] = 1 - Prob[failure interval <= runtime]
+  #   = 1 - cdf(runtime) 
+  process_success_prob = 1 - stats.expon.cdf(x=runtime, scale=1/lamb)
+  # probability of success reconstruction = Prob[all processes complete before failure] 
+  reconstruction_success_prob = stats.binom.pmf(num_processes, num_processes, process_success_prob)
+  # exp_runtime = runtime * 1/reconstruction_success_prob
+  # For simplicity, we assume the execution of failure reconstruction = MTTF
+  fail_runtime_simul = np.random.exponential(scale=1/lamb, size=(10000, num_processes))
+  fail_runtime = np.mean(np.min(fail_runtime_simul, 1))
+  exp_runtime = runtime + (1 - reconstruction_success_prob)/reconstruction_success_prob*fail_runtime
+  return exp_runtime
+
 def exp_resilient_runtime(lamb, num_processes, runtime):
   if lamb == 0:
     return runtime
@@ -57,6 +73,23 @@ def simulate_no_resilient_runtime(lamb, num_processes, runtime):
       process_state = np.sum(np.where(process_state > runtime, 1, 0))
       if process_state == num_processes:
         break
+    total_tries += count
+  act_runtime = total_tries / ntries * runtime
+  return act_runtime
+
+def simulate_no_resilient_resume_runtime(lamb, num_processes, runtime):
+  ntries = 1000
+  total_tries = 0
+  if lamb == 0:
+    lamb = 0.00000000001
+  for i in range(ntries):
+    num_exec = num_processes
+    count = 0
+    while num_exec > 0:
+      count += 1
+      process_state = np.random.exponential(scale=1/lamb, size=num_exec)
+      finished = np.sum(np.where(process_state > runtime, 1, 0))
+      num_exec -= finished
     total_tries += count
   act_runtime = total_tries / ntries * runtime
   return act_runtime
@@ -130,7 +163,7 @@ def plot_fig(data, probs, figpath):
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
 
-def plot_resilient(data, probs, figpath):
+def plot_resilient(data, probs, figpath, normalized_value=1):
   width = 0.15
   # plt.figure(figsize=(10, 6))
   lapp = None
@@ -139,7 +172,9 @@ def plot_resilient(data, probs, figpath):
       lapp = approach
   plt.figure()
   m = 0
-  for approach in data:
+  approaches = ["no-resilient", "veloc", "veloc-dynamic"]
+  # for approach in data:
+  for approach in approaches:
     appconf = data[approach]
     appdata = data[approach]["elapsed-time"]
     total = []
@@ -150,15 +185,62 @@ def plot_resilient(data, probs, figpath):
           break
     x = np.arange(len(probs))
     total = np.array(total)
-    plt.bar(x + width*m, total, width, facecolor="none", edgecolor=appconf["color"], hatch="//", label=appconf["label"])
+    plt.bar(x + width*m, total/normalized_value, width, facecolor="none", edgecolor=appconf["color"], hatch="//", label=appconf["label"])
+    print(total/normalized_value)
     m += 1
   plt.xlabel("Mean Time to Failure (sec)")
   plt.xticks(np.arange(len(probs)), 1/np.array(probs))
-  plt.ylabel("Reconstrucution Time (sec)")
-  plt.yscale("log")
-  plt.ylim(0, 31536000) # A year
+  # plt.ylabel("Reconstrucution Time (sec)")
+  plt.ylabel("Normalized Reconstruction Time")
+  # plt.yscale("log")
+  # plt.ylim(0, 31536000) # A year
+  plt.ylim(0, 20) # A year
   
-  plt.legend(loc="best")
+  # plt.legend(loc="best")
+  plt.tight_layout()
+  plt.savefig(figpath + ".png")
+  plt.savefig(figpath + ".pdf")
+
+def plot_breakdown(data, figpath, approach, normalized_value=1):
+  width = 0.15
+  # plt.figure(figsize=(10, 6))
+  times = ["ckpt", "comm", "exec"]
+  colors = {
+    "exec" : "orange",
+    "ckpt" : "blue",
+    "comm" : "green"
+  }
+  labels = {
+    "exec" : "Execution",
+    "ckpt" : "Checkpointing",
+    "comm" : "Data Redistribution"
+  }
+  
+  probs = []
+  mtimes = {}
+  for time in times:
+    mtimes[time] = []
+  for info in data[approach]["elapsed-time"]:
+    probs.append(info["prob"])
+    for time in times:
+      mtimes[time].append(info[time])
+    
+  plt.figure()
+  x = np.arange(len(probs))
+  m=0
+  for time in times:
+    plt.bar(x + width*m, np.array(mtimes[time])/normalized_value, width, facecolor="none", edgecolor=colors[time], hatch="//", label=labels[time])
+    print(time, np.array(mtimes[time])/normalized_value)
+    m += 1
+  plt.xlabel("Mean Time to Failure (sec)")
+  plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  # plt.ylabel("Reconstrucution Time (sec)")
+  plt.ylabel("Normalized Elapsed Time")
+  plt.yscale("log")
+  # plt.ylim(0, 31536000) # A year
+  # plt.ylim(0, 20) # A year
+  
+  # plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
@@ -195,32 +277,36 @@ if __name__ == "__main__":
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
   plt.rcParams['legend.fontsize'] = 16
 
-  probs = [0, 0.005, 0.01, 0.02, 0.05, 0.1]
-  plot_fig(plotdata["exp_failure"], probs, figpath + "/elapsed-time-no-retry")
-  # plot_fig(plotdata["with-retries"], probs, figpath + "/elapsed-time-with-retry")
+  # probs = [0, 0.005, 0.01, 0.02, 0.05, 0.1]
+  # plot_fig(plotdata["exp_failure"], probs, figpath + "/elapsed-time-no-retry")
+  # # plot_fig(plotdata["with-retries"], probs, figpath + "/elapsed-time-with-retry")
   
-  # Calculate runtime for no resilient implementation
-  no_resilience = {}
-  no_resilience["label"] = "No Resilience"
-  no_resilience["color"] = "orange"
-  no_resilience["elapsed-time"] = []
-  ideal_exec_time = 0
-  elapsed_time_info = plotdata["with-retries"]["veloc"]["elapsed-time"]
-  for info in elapsed_time_info:
-    if info["prob"] == 0:
-      ideal_exec_time = info["total"] - info["ckpt"] - info["comm"]
-    # exp_total = exp_resilient_runtime(info["prob"], 64, info["total"])
-    # info["total"] = exp_total
+  # # Calculate runtime for no resilient implementation
+  # no_resilience = {}
+  # no_resilience["label"] = "No Resilience"
+  # no_resilience["color"] = "orange"
+  # no_resilience["elapsed-time"] = []
+  # ideal_exec_time = 0
+  # elapsed_time_info = plotdata["with-retries"]["veloc"]["elapsed-time"]
+  # for info in elapsed_time_info:
+  #   if info["prob"] == 0:
+  #     ideal_exec_time = info["total"] - info["ckpt"] - info["comm"]
+  #   # exp_total = exp_resilient_runtime(info["prob"], 64, info["total"])
+  #   # info["total"] = exp_total
+  # # probs = [0, 0.0001, 0.001, 0.01, 0.1]
   # probs = [0, 0.0001, 0.001, 0.01, 0.1]
-  probs = [0, 0.0001, 0.001, 0.01, 0.1]
-  for prob in probs:
-    info = {}
-    info["prob"] = prob
-    info["total"] = exp_no_resilient_runtime(prob, 64, ideal_exec_time)
-    no_resilience["elapsed-time"].append(info)
-  plotdata["with-retries"]["no-resilient"] = no_resilience
-  plot_resilient(plotdata["with-retries"], probs, figpath + "/elapsed-time-resilient")
-
+  # for prob in probs:
+  #   info = {}
+  #   info["prob"] = prob
+  #   # info["total"] = exp_no_resilient_runtime(prob, 64, ideal_exec_time)
+  #   info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
+  #   no_resilience["elapsed-time"].append(info)
+  # plotdata["with-retries"]["no-resilient"] = no_resilience
+  # normalized_value = ideal_exec_time
+  # print(ideal_exec_time)
+  # plot_resilient(plotdata["with-retries"], probs, figpath + "/elapsed-time-resilient", normalized_value)
+  normalized_value=59.682124539
+  plot_breakdown(plotdata["with-retries"], figpath + "/elapsed-time-breakdown", "veloc-dynamic", normalized_value)
 
  
 

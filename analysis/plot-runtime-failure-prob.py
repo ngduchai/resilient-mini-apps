@@ -28,6 +28,27 @@ def exp_no_resilient_runtime(lamb, num_processes, runtime):
   exp_runtime = runtime + (1 - reconstruction_success_prob)/reconstruction_success_prob*fail_runtime
   return exp_runtime
   
+def simulate_no_resilient_resume_runtime(lamb, num_processes, runtime):
+  if num_processes == 1:
+    return 10000*runtime
+  ntries = 100
+  total_tries = 0
+  if lamb == 0:
+    lamb = 0.00000000001
+  for i in range(ntries):
+    num_exec = num_processes
+    count = 0
+    while num_exec > 0:
+      count += 1
+      process_state = np.random.exponential(scale=1/lamb, size=num_exec)
+      finished = np.sum(np.where(process_state > runtime, 1, 0))
+      num_exec -= finished
+      if count > 10000:
+        break
+    total_tries += count
+  act_runtime = total_tries / ntries * runtime
+  print(num_processes, act_runtime)
+  return act_runtime
 
 if __name__ == "__main__":
 
@@ -39,7 +60,9 @@ if __name__ == "__main__":
   plt.rcParams['legend.fontsize'] = 16
 
   # mttf = 5.55555556e-8 # 1 per 5k hours
-  mttf = 1/(30*24*3600) # Assume a process can run for 1 month without failure
+  # mttf = 1/(30*24*3600) # Assume a process can run for 1 month without failure
+  mttf = 1/(24*3600) # Assume a process can run for 1 month without failure
+  # mttf = 1/(365*24*3600) # Assume a process can run for 1 year without failure
   resolutions = ["640x640", "2000x2000"]
   per_slice_runtime = {
     "640x640" : 6,
@@ -64,7 +87,8 @@ if __name__ == "__main__":
     for resolution in resolutions:
       ideal_runtime = per_slice_runtime[resolution] * slice_per_process * num_iter
       ideal_runtimes[resolution].append(ideal_runtime / serial_runtimes[resolution])
-      exp_runtime = exp_no_resilient_runtime(mttf, num_process, ideal_runtime)
+      # exp_runtime = exp_no_resilient_runtime(mttf, num_process, ideal_runtime)
+      exp_runtime = simulate_no_resilient_resume_runtime(mttf, num_process, ideal_runtime)
       exp_runtimes[resolution].append(exp_runtime / serial_runtimes[resolution])
   
   colors = {
@@ -81,16 +105,17 @@ if __name__ == "__main__":
     # plt.plot(x, ideal_runtimes[resolution], color=colors[resolution], label=resolution + " (ideal)")
     plt.bar(x + width*m, exp_runtimes[resolution], width, facecolor="none", edgecolor=colors[resolution], hatch="//", label=resolution)
     m += 1
+    print(resolution, exp_runtimes[resolution])
   plt.plot(x, ideal_runtimes[resolution], color="green", marker="o", label="Ideal")
   plt.xlabel("Number of processes")
   plt.xticks(x, num_processes)
   plt.ylabel("Normalized Reconstruction Time")
   plt.yscale("log")
-  plt.grid(which='major', color='black', linestyle='-', zorder=-1)   # Major grid
-  plt.grid(which='minor', color='gray', linestyle='--', linewidth=0.5, zorder=-1)   # Minor grid
+  # plt.grid(which='major', color='black', linestyle='-', zorder=-1)   # Major grid
+  # plt.grid(which='minor', color='gray', linestyle='--', linewidth=0.5, zorder=-1)   # Minor grid
 
 
-  plt.legend(loc="lower left")
+  # plt.legend(loc="lower left")
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
