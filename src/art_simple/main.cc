@@ -622,9 +622,9 @@ int main(int argc, char* argv[])
                     return collected_loaddiff[i] < collected_loaddiff[j];
                 });
                 std::cout << "[Task-" << id << "]: Trying to move data from overloaded tasks to underloaded onces" << std::endl; 
-                for (int i = 0; i < num_tasks; ++i) {
-                    std::cout << "ld_indexes " << i << " " << ld_indexes[i] << " -> " << collected_loaddiff[ld_indexes[i]] << std::endl;
-                }
+                // for (int i = 0; i < num_tasks; ++i) {
+                //     std::cout << "ld_indexes " << i << " " << ld_indexes[i] << " -> " << collected_loaddiff[ld_indexes[i]] << std::endl;
+                // }
                 int i = 0;
                 int j = num_tasks-1;
                 int remain_load = total_overload;
@@ -655,9 +655,7 @@ int main(int argc, char* argv[])
                 int transfer_limit = (remain_load-1) / active_tasks + 1;
                 std::cout << "[Task-" << id << "]: Remain total_overload: " << remain_load << ". Spread them among tasks. Dynamic Redistribution transfer_limit: " << transfer_limit << std::endl;
                 while (j > i && collected_loaddiff[ld_indexes[j]] > 0) {
-                    std::cout << "out: i: " << i << " j: " << j << std::endl;
                     while (collected_loaddiff[ld_indexes[j]] > 0) {
-                        std::cout << "in: i: " << i << " j: " << j << std::endl;
                         int k = (ld_indexes[j]+1) % num_tasks;
                         // do {
                         //     k = (k+1) % num_tasks;
