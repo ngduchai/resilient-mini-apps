@@ -622,9 +622,9 @@ int main(int argc, char* argv[])
                     return collected_loaddiff[i] < collected_loaddiff[j];
                 });
                 std::cout << "[Task-" << id << "]: Trying to move data from overloaded tasks to underloaded onces" << std::endl; 
-                // for (int i = 0; i < num_tasks; ++i) {
-                //     std::cout << "ld_indexes " << i << " " << ld_indexes[i] << " -> " << collected_loaddiff[ld_indexes[i]] << std::endl;
-                // }
+                for (int i = 0; i < num_tasks; ++i) {
+                    std::cout << "ld_indexes " << i << " " << ld_indexes[i] << " -> " << collected_loaddiff[ld_indexes[i]] << std::endl;
+                }
                 int i = 0;
                 int j = num_tasks-1;
                 int remain_load = total_overload;
