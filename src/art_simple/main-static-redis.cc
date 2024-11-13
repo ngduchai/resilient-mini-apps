@@ -475,6 +475,15 @@ int main(int argc, char* argv[])
             if (id == mpi_root) {
                 std::cout << "Found " << removed_tasks.size() << " task(s) stop working, start recovery..." << std::endl;
             }
+            int recovered_size = 0;
+            float * recovered_recon = nullptr;
+            int * recovered_row_indexes = nullptr;
+            int * ckpt_progress = nullptr;
+            int * collected_recovered_rows = nullptr;
+            int * displacements = nullptr;
+            float * local_recovered_recon = new float [recon_size];
+            int * local_recovered_row_indexes = new int [dy];
+            int * local_ckpt_progress = new int [dy];
             if (task_is_active) {
                 // Remaining active tasks recover the checkpoints of inactive ones
                 int num = (removed_tasks.size() / active_tasks);
@@ -482,34 +491,122 @@ int main(int argc, char* argv[])
                     num++;
                 }
                 // Read data from checkpoints
-                bool ckpt_loaded = false; 
                 for (int j = 0; j < num; ++j) {
                     int ckpt_size = removed_tasks.size();
                     int numread = dy;
-                    int v = progress-1;
+                    int v = progress;
                     // unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
                     unsigned int ckpt_id = removed_tasks[active_tasks*j + task_index];
                     std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
-                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recon+num_rows*sinogram_size, row_indexes+num_rows, local_progress+num_rows);
-                    std::cout << "[Task-" << id << "]: Recovery completed, checkpoint: " << ckpt_id << ", progress: " << v << " num_row: " << numread << " num_ckpt: " << ckpt_size << std::endl;
-                    // Update input data for tasks receiving new slices
-                    for (int i = num_rows; i < num_rows+numread; ++i) {
-                        std::cout << "[Task-" << id << "]: " << "Recovered row: at #" << row_indexes[i] << ", progress: " << local_progress[i] << std::endl;
-                        memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
-                    }
-                    num_rows += numread;
-                    ckpt_loaded = true;
+                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size, local_ckpt_progress+recovered_size);
+                    std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << ckpt_id << ", progress: " << v << " num_row: " << numread << " num_ckpt: " << ckpt_size << std::endl;
+                    recovered_size += numread;
                 }
-                if (ckpt_loaded) {
-                    ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
-                    ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
-                    ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
-                    ckpt->mem_protect(2, local_recon, std::max(num_rows, 1)*sinogram_size, sizeof(float));
-                    ckpt->mem_protect(3, row_indexes, std::max(num_rows, 1), sizeof(int));
-                    ckpt->mem_protect(4, local_progress, std::max(num_rows, 1), sizeof(int));
+            }
+
+            // Gather the checkpoints at the root then redistribute across tasks
+            if (id == mpi_root) {
+                recovered_recon = new float [recon_size];
+                recovered_row_indexes = new int [dy];
+                ckpt_progress = new int [dy];
+                collected_recovered_rows = new int[num_tasks];
+                displacements = new int[num_tasks];
+            }
+
+            int total_recovered_size = 0;
+            MPI_Allreduce(&recovered_size, &total_recovered_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Gather(&recovered_size, 1, MPI_INT, collected_recovered_rows, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            if (id == mpi_root) {
+                displacements[0] = 0;
+                for (int i = 1; i < num_tasks; ++i) {
+                    displacements[i] = displacements[i-1] + collected_recovered_rows[i-1];
+
                 }
+            }
+            // Sync with root
+            MPI_Gatherv(local_recovered_row_indexes, recovered_size, MPI_INT, recovered_row_indexes, collected_recovered_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            MPI_Gatherv(local_ckpt_progress, recovered_size, MPI_INT, ckpt_progress, collected_recovered_rows, displacements, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            if (id == mpi_root) {
+                for (int i = 0; i < num_tasks; ++i) {
+                    displacements[i] *= sinogram_size;
+                    collected_recovered_rows[i] *= sinogram_size;
+                }
+            }
+            MPI_Gatherv(local_recovered_recon, recovered_size*sinogram_size, MPI_FLOAT, recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+
+            // if (id == mpi_root) {
+            //     std::cout << "[task-" << id << "]: complete collecting data at root" << std::endl;
+            // }
+
+            // Estimate the data size each task will receive
+            if (task_is_active) {
+                // recovered_size = total_recovered_size / active_tasks;
+                // if (total_recovered_size % active_tasks > active_tasks - 1 - task_index) {
+                // // if (total_recovered_size % active_tasks > task_index) {
+                //     recovered_size++;
+                // }
+                int adj_num_rows = dy / active_tasks;
+                if (dy % active_tasks > task_index) {
+                // if (total_recovered_size % active_tasks > task_index) {
+                    adj_num_rows++;
+                }
+                recovered_size = std::max(adj_num_rows - num_rows, 0);
             }else{
+                recovered_size = 0;
+            }
+
+            MPI_Gather(&recovered_size, 1, MPI_INT, collected_recovered_rows, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            if (id == mpi_root) {
+                displacements[0] = 0;
+                for (int i = 1; i < num_tasks; ++i) {
+                    displacements[i] = displacements[i-1] + collected_recovered_rows[i-1];
+                }
+            }
+            
+            // Reditribute data from root
+            MPI_Scatterv(recovered_row_indexes, collected_recovered_rows, displacements, MPI_INT, row_indexes+num_rows, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            MPI_Scatterv(ckpt_progress, collected_recovered_rows, displacements, MPI_INT, local_progress+num_rows, recovered_size, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            if (id == mpi_root) {
+                for (int i = 0; i < num_tasks; ++i) {
+                    displacements[i] *= sinogram_size;
+                    collected_recovered_rows[i] *= sinogram_size;
+                }
+            }
+            MPI_Scatterv(recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, local_recon+num_rows*sinogram_size, recovered_size*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+
+            // Update input data for tasks receiving new slices
+            if (task_is_active && recovered_size > 0) {
+                std::string rindex = " [";
+                for (int i = num_rows; i < num_rows+recovered_size; ++i) {
+                    rindex += " " + std::to_string(row_indexes[i]) + ", ";
+                }
+                rindex += "]";
+                std::cout << "[Task-" << id << "]: Complete collecting rows from root, new rows = " << recovered_size << " -- total: " << num_rows <<  rindex << std::endl;
+                for (int i = 0; i < recovered_size; ++i) {
+                    memcpy(local_data + num_rows*dt*dx + i*dt*dx, data_swap+row_indexes[num_rows+i]*dt*dx, sizeof(float)*dt*dx);
+                }
+                num_rows += recovered_size;
+            }
+            if (!task_is_active) {
                 num_rows = 0;
+            }
+            
+            if (task_is_active) {
+                ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
+                ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
+                ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
+                ckpt->mem_protect(2, local_recon, std::max(num_rows, 1)*sinogram_size, sizeof(float));
+                ckpt->mem_protect(3, row_indexes, std::max(num_rows, 1), sizeof(int));
+                ckpt->mem_protect(4, local_progress, std::max(num_rows, 1), sizeof(int));
+            }
+
+            delete [] local_recovered_recon;
+            delete [] local_recovered_row_indexes;
+            delete [] local_ckpt_progress;
+            if (id == mpi_root) {
+                delete [] recovered_recon;
+                delete [] recovered_row_indexes;
+                delete [] ckpt_progress;
             }
         }
 
