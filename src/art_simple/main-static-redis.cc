@@ -470,7 +470,7 @@ int main(int argc, char* argv[])
 
         auto recovery_start = std::chrono::high_resolution_clock::now();
 
-        if (!removed_tasks.empty()) {
+        if (!removed_tasks.empty() || restarted) {
             // Some tasks fails, recover their progress from checkpoints
             if (id == mpi_root) {
                 std::cout << "Found " << removed_tasks.size() << " task(s) stop working, start recovery..." << std::endl;
