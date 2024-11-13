@@ -441,17 +441,21 @@ int main(int argc, char* argv[])
             local_active_index = 0;
 
             // Reload checkpoints
-            if (progress > 0) {
-                std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
-                num_rows = dy;
-                int v = progress-1;
-                recover(ckpt, id, ckpt_name, sinogram_size, v, &num_ckpt, num_rows, local_recon, row_indexes, local_progress, true);
-                for (int i = 0; i < num_rows; ++i) {
-                    memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
-                }
-                std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << id << ", version: " << v << " num_row: " << num_rows << " num_ckpt: " << num_ckpt << std::endl;
-                MPI_Bcast(&num_ckpt, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
-                progress--;
+            // if (progress > 0) {
+            //     std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
+            //     num_rows = dy;
+            //     int v = progress-1;
+            //     recover(ckpt, id, ckpt_name, sinogram_size, v, &num_ckpt, num_rows, local_recon, row_indexes, local_progress, true);
+            //     for (int i = 0; i < num_rows; ++i) {
+            //         memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
+            //     }
+            //     std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << id << ", version: " << v << " num_row: " << num_rows << " num_ckpt: " << num_ckpt << std::endl;
+            //     MPI_Bcast(&num_ckpt, 1, MPI_INT, mpi_root, MPI_COMM_WORLD);
+            //     progress--;
+            // }
+            removed_tasks.clear();
+            for (int i = 0; i < num_tasks; ++i) {
+                removed_tasks.push_back(i);
             }
 
             int * num_row_trackers = new int [num_tasks];
@@ -462,7 +466,6 @@ int main(int argc, char* argv[])
                     added_tasks.push_back(i);
                 }
             }
-            removed_tasks.clear();
             active_tasks = num_tasks;
             delete [] num_row_trackers;
             restarted = true;
@@ -498,7 +501,7 @@ int main(int argc, char* argv[])
                     // unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
                     unsigned int ckpt_id = removed_tasks[active_tasks*j + task_index];
                     std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
-                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size, local_ckpt_progress+recovered_size);
+                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size, local_ckpt_progress+recovered_size, restarted);
                     std::cout << "[task-" << id << "]: Recovery completed, checkpoint: " << ckpt_id << ", progress: " << v << " num_row: " << numread << " num_ckpt: " << ckpt_size << std::endl;
                     recovered_size += numread;
                 }
