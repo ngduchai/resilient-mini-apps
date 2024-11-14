@@ -820,6 +820,7 @@ int main(int argc, char* argv[])
             ofile << "\"prob\" : " << failure_prob << "," << std::endl;
             ofile << "\"nprocs\" : " << num_tasks << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
+            ofile << "\"approach\" : " << "static-redis" << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
             ofile << "\"filename\" : \"" << filename << "\"," << std::endl;
