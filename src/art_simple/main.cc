@@ -464,6 +464,7 @@ int main(int argc, char* argv[])
             }
             removed_tasks.clear();
             active_tasks = num_tasks;
+            task_index = id;
             delete [] num_row_trackers;
             restarted = true;
         }

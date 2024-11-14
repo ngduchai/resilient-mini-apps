@@ -457,6 +457,7 @@ int main(int argc, char* argv[])
             for (int i = 0; i < num_tasks; ++i) {
                 removed_tasks.push_back(i);
             }
+            progress--;
 
             int * num_row_trackers = new int [num_tasks];
             MPI_Allgather(&num_rows, 1, MPI_INT, num_row_trackers, 1, MPI_INT, MPI_COMM_WORLD);
@@ -467,6 +468,7 @@ int main(int argc, char* argv[])
                 }
             }
             active_tasks = num_tasks;
+            task_index = id;
             delete [] num_row_trackers;
             restarted = true;
         }
@@ -493,6 +495,7 @@ int main(int argc, char* argv[])
                 if (removed_tasks.size() % active_tasks > task_index) {
                     num++;
                 }
+
                 // Read data from checkpoints
                 for (int j = 0; j < num; ++j) {
                     int ckpt_size = removed_tasks.size();
