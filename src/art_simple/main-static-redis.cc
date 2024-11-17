@@ -841,6 +841,7 @@ int main(int argc, char* argv[])
             ofile << "\"ckpt\" : " << ckpt_time << "," << std::endl;
             ofile << "\"comm\" : " << comm_time << "," << std::endl;
             ofile << "\"recover\" : " << recovery_time << std::endl;
+            ofile << "\"task_failures\" : " << stat_num_failures << std::endl;
             ofile << "}," << std::endl;
         }else{
             std::cerr << "Cannot save the experiment configuration and timing" << std::endl;
