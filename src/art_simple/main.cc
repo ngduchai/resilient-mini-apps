@@ -317,6 +317,7 @@ int main(int argc, char* argv[])
     //     {1, 0, 0, 1, 0, 0, 0, 0, 0, 0}
     // };
     std::vector<int> task_state_history;
+    int stat_num_failures = 0;
     
     if (id == mpi_root) {
         progress = ckpt->restart_test(ckpt_name, 0, id);
@@ -473,6 +474,7 @@ int main(int argc, char* argv[])
 
         if (!removed_tasks.empty()) {
             // Some tasks fails, recover their progress from checkpoints
+            stat_num_failures += removed_tasks.size();
             if (id == mpi_root) {
                 std::cout << "Found " << removed_tasks.size() << " task(s) stop working, start recovery..." << std::endl;
             }
@@ -904,6 +906,7 @@ int main(int argc, char* argv[])
             ofile << "\"ckpt\" : " << ckpt_time << "," << std::endl;
             ofile << "\"comm\" : " << comm_time << "," << std::endl;
             ofile << "\"recover\" : " << recovery_time << std::endl;
+            ofile << "\"task_failures\" : " << stat_num_failures << std::endl;
             ofile << "}," << std::endl;
         }else{
             std::cerr << "Cannot save the experiment configuration and timing" << std::endl;
