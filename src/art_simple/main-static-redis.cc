@@ -582,8 +582,13 @@ int main(int argc, char* argv[])
                     }
                 }
                 MPI_Scatterv(recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, local_recon+num_rows*sinogram_size, recovered_size*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
+            }else{
+                // Just copy from recovery
+                memcpy(local_recon+num_rows*sinogram_size, local_recovered_recon, sizeof(float)*recovered_size*sinogram_size);
+                memcpy(row_indexes+num_rows, local_recovered_row_indexes, sizeof(int)*recovered_size);
+                memcpy(local_progress+num_rows, local_ckpt_progress, sizeof(int)*recovered_size);
             }
-            
+
             // Update input data for tasks receiving new slices
             if (task_is_active && recovered_size > 0) {
                 std::string rindex = " [";
