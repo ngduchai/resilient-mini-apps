@@ -582,41 +582,41 @@ int main(int argc, char* argv[])
                     }
                 }
                 MPI_Scatterv(recovered_recon, collected_recovered_rows, displacements, MPI_FLOAT, local_recon+num_rows*sinogram_size, recovered_size*sinogram_size, MPI_FLOAT, mpi_root, MPI_COMM_WORLD);
-
-                // Update input data for tasks receiving new slices
-                if (task_is_active && recovered_size > 0) {
-                    std::string rindex = " [";
-                    for (int i = num_rows; i < num_rows+recovered_size; ++i) {
-                        rindex += " " + std::to_string(row_indexes[i]) + ", ";
-                    }
-                    rindex += "]";
-                    std::cout << "[Task-" << id << "]: Complete collecting rows from root, new rows = " << recovered_size << " -- total: " << num_rows <<  rindex << std::endl;
-                    for (int i = 0; i < recovered_size; ++i) {
-                        memcpy(local_data + num_rows*dt*dx + i*dt*dx, data_swap+row_indexes[num_rows+i]*dt*dx, sizeof(float)*dt*dx);
-                    }
-                    num_rows += recovered_size;
+            }
+            
+            // Update input data for tasks receiving new slices
+            if (task_is_active && recovered_size > 0) {
+                std::string rindex = " [";
+                for (int i = num_rows; i < num_rows+recovered_size; ++i) {
+                    rindex += " " + std::to_string(row_indexes[i]) + ", ";
                 }
-                if (!task_is_active) {
-                    num_rows = 0;
+                rindex += "]";
+                std::cout << "[Task-" << id << "]: Complete collecting rows from root, new rows = " << recovered_size << " -- total: " << num_rows <<  rindex << std::endl;
+                for (int i = 0; i < recovered_size; ++i) {
+                    memcpy(local_data + num_rows*dt*dx + i*dt*dx, data_swap+row_indexes[num_rows+i]*dt*dx, sizeof(float)*dt*dx);
                 }
+                num_rows += recovered_size;
+            }
+            if (!task_is_active) {
+                num_rows = 0;
+            }
                 
-                if (task_is_active) {
-                    ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
-                    ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
-                    ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
-                    ckpt->mem_protect(2, local_recon, std::max(num_rows, 1)*sinogram_size, sizeof(float));
-                    ckpt->mem_protect(3, row_indexes, std::max(num_rows, 1), sizeof(int));
-                    ckpt->mem_protect(4, local_progress, std::max(num_rows, 1), sizeof(int));
-                }
+            if (task_is_active) {
+                ckpt = veloc::get_client((unsigned int)task_index, check_point_config);
+                ckpt->mem_protect(0, &num_ckpt, 1, sizeof(int));
+                ckpt->mem_protect(1, &num_rows, 1, sizeof(int));
+                ckpt->mem_protect(2, local_recon, std::max(num_rows, 1)*sinogram_size, sizeof(float));
+                ckpt->mem_protect(3, row_indexes, std::max(num_rows, 1), sizeof(int));
+                ckpt->mem_protect(4, local_progress, std::max(num_rows, 1), sizeof(int));
+            }
 
-                delete [] local_recovered_recon;
-                delete [] local_recovered_row_indexes;
-                delete [] local_ckpt_progress;
-                if (id == mpi_root) {
-                    delete [] recovered_recon;
-                    delete [] recovered_row_indexes;
-                    delete [] ckpt_progress;
-                }
+            delete [] local_recovered_recon;
+            delete [] local_recovered_row_indexes;
+            delete [] local_ckpt_progress;
+            if (id == mpi_root) {
+                delete [] recovered_recon;
+                delete [] recovered_row_indexes;
+                delete [] ckpt_progress;
             }
         }
 
