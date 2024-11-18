@@ -301,13 +301,9 @@ H is the hatch used for identification of the different dataframe"""
 
     return axe
 
-def plot_resilient_breakdown(data, probs, figpath, normalized_value=1):
+def plot_resilient_breakdown(data, varied_param, fixed_params, figpath, normalized_value=1):
   width = 0.15
   # plt.figure(figsize=(10, 6))
-  lapp = None
-  for approach in data:
-    if lapp == None or len(data[approach]["elapsed-time"]) > len(data[lapp]["elapsed-time"]):
-      lapp = approach
   plt.figure()
   m = 0
   approaches = ["no-resilient", "veloc", "veloc-dynamic"]
@@ -319,6 +315,7 @@ def plot_resilient_breakdown(data, probs, figpath, normalized_value=1):
   total_times = {}
   total_times_np = {}
   total_times_niter = {}
+  
   for approach in approaches:
     appconf = data[approach]
     appdata = data[approach]["elapsed-time"]
@@ -326,21 +323,23 @@ def plot_resilient_breakdown(data, probs, figpath, normalized_value=1):
     comp = []
     comm = []
     ckpt = []
-    for prob in probs:
+    for vvalue in varied_param["values"]:
       for info in appdata:
-        if prob == info["prob"]:
-          total.append(info["total"])
-          comp.append(info["exec"])
-          comm.append(info["comm"])
-          ckpt.append(info["ckpt"])
-          break
-    total_times[approach] = pd.DataFrame(np.array([ckpt, comm, comp]).transpose(), index=1/np.array(probs), columns=["Checkpoint", "Communicate", "Compute"])
-    total_times_niter[approach] = pd.DataFrame(np.array([ckpt, comm, comp]).transpose(), index=[10, 20, 30, 40, 50], columns=["Checkpoint", "Communicate", "Compute"])
-    total_times_np[approach] = pd.DataFrame(np.array([ckpt, comm, comp]).transpose(), index=[1, 4, 16, 64, 256], columns=["Checkpoint", "Communicate", "Compute"])
+        if vvalue == info[varied_param["key"]]:
+          found = True
+          for fixed_param in fixed_params:
+            if info[fixed_param] != info[fixed_param]:
+              found = False
+              break
+          if found:
+            total.append(info["total"])
+            comp.append(info["exec"])
+            comm.append(info["comm"])
+            ckpt.append(info["ckpt"])
+            break
+    total_times[approach] = pd.DataFrame(np.array([ckpt, comm, comp]).transpose(), index=varied_param["labels"], columns=["Checkpoint", "Communicate", "Compute"])
 
-  plot_clustered_stacked(figpath + "/elapsed-time-varying-mttf", "Mean time to Failure (sec)", list(total_times.values()), ["No Resilient", "+Ckpt", "+Ckpt +Dynamic Redist"], hashes=["", "//", "o"])
-  plot_clustered_stacked(figpath + "/elapsed-time-varying-iter", "Number of Iterations", list(total_times_niter.values()), ["No Resilient", "+Ckpt", "+Ckpt +Dynamic Redist"], hashes=["", "//", "o"])
-  plot_clustered_stacked(figpath + "/elapsed-time-varying-np", "Number of Reconstruction Tasks", list(total_times_np.values()), ["No Resilient", "+Ckpt", "+Ckpt +Dynamic Redist"], hashes=["", "//", "o"])
+  plot_clustered_stacked(figpath, varied_param["xlabel"], list(total_times.values()), ["No Resilient", "+Ckpt", "+Ckpt +Dynamic Redist"], hashes=["", "//", "o"])
   
 
 
@@ -397,6 +396,8 @@ if __name__ == "__main__":
   for prob in probs:
     info = {}
     info["prob"] = prob
+    info["nprocs"] = 64
+    info["num_iter"] = 10
     # info["total"] = exp_no_resilient_runtime(prob, 64, ideal_exec_time)
     info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
     info["exec"] = info["total"]
@@ -407,8 +408,20 @@ if __name__ == "__main__":
   plotdata["with-retries"]["no-resilient"] = no_resilience
   # normalized_value = ideal_exec_time
   print(ideal_exec_time)
+  # normalized_value=59.682124539
   normalized_value = 1
-  plot_resilient_breakdown(plotdata["with-retries"], probs, figpath, normalized_value)
+  plot_resilient_breakdown(
+    plotdata["with-retries"],
+    {
+      "key" : "prob",
+      "values" : probs,
+      "labels" : 1/np.array(probs),
+      "xlabel" : "Mean time to Failure (seC)"
+    },
+    {"nprocs": 64, "num_iter": 10},
+    figpath + "/elapsed-time-varying-mttf",
+    normalized_value
+  )
   # plot_resilient(plotdata["with-retries"], probs, figpath + "/elapsed-time-resilient", normalized_value)
   # # normalized_value=59.682124539
   # normalized_value=1
