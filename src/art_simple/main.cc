@@ -660,8 +660,11 @@ int main(int argc, char* argv[])
                 // int transfer_limit = (remain_load-1) / active_tasks + 1;
                 int transfer_limit = (remain_load-1) / active_tasks + 1;
                 std::cout << "[Task-" << id << "]: Remain total_overload: " << remain_load << ". Spread them among tasks. Dynamic Redistribution transfer_limit: " << transfer_limit << std::endl;
+                std::cout << "[Task-" << id << "]: i = " << i << "j = " << j << "ld_indexes[j] = " << ld_indexes[j] << " collected_loaddiff = " << collected_loaddiff[ld_indexes[j]] << std::endl;
                 while (j > i && collected_loaddiff[ld_indexes[j]] > 0) {
+                    std::cout << "[Task-" << id << "]: OUTER -- i = " << i << "j = " << j << "ld_indexes[j] = " << ld_indexes[j] << " collected_loaddiff = " << collected_loaddiff[ld_indexes[j]] << std::endl;
                     while (collected_loaddiff[ld_indexes[j]] > 0) {
+                        std::cout << "[Task-" << id << "]: INNER -- i = " << i << "j = " << j << "ld_indexes[j] = " << ld_indexes[j] << " collected_loaddiff = " << collected_loaddiff[ld_indexes[j]] << std::endl;
                         int k = (ld_indexes[j]+1) % num_tasks;
                         // do {
                         //     k = (k+1) % num_tasks;
