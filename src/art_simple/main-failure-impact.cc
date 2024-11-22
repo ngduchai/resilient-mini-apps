@@ -101,8 +101,8 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
 int main(int argc, char* argv[])
 {
 
-    if(argc != 10) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> <allow_restart> [veloc config]" << std::endl;
+    if(argc != 11) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_iter> <failure_ratio> <make_ckpt> [veloc config]" << std::endl;
         return 1;
     }
 
@@ -116,7 +116,8 @@ int main(int argc, char* argv[])
     int nslices = atoi(argv[6]);
     int failure_iter = atoi(argv[7]);
     float failure_ratio = atof(argv[8]);
-    const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
+    bool make_ckpt = atoi(argv[9]) == 1 ? true : false;
+    const char* check_point_config = (argc == 11) ? argv[10] : "art_simple.cfg";
     bool allow_restart = false;
 
     std::cout << "Reading data..." << std::endl;
@@ -762,7 +763,7 @@ int main(int argc, char* argv[])
         // Save progress with checkpoint
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
-        if (task_is_active && !restarted) {
+        if (task_is_active && !restarted && make_ckpt) {
             ckpt->checkpoint_wait();
             if (!ckpt->checkpoint(ckpt_name, progress)) {
                 std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
@@ -882,6 +883,7 @@ int main(int argc, char* argv[])
             ofile << "\"failure_ratio\" : " << failure_ratio << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
+            ofile << "\"make_ckpt\" : " << make_ckpt << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
             ofile << "\"filename\" : \"" << filename << "\"," << std::endl;
             ofile << "\"ngridx\" : " << ngridx << "," << std::endl;
