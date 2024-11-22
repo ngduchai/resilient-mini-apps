@@ -403,7 +403,11 @@ int main(int argc, char* argv[])
                 std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
                 num_rows = dy;
                 int v = progress-1;
-                recover(ckpt, id, ckpt_name, sinogram_size, v, &num_ckpt, num_rows, local_recon, row_indexes, true);
+                if (make_ckpt) {
+                    recover(ckpt, id, ckpt_name, sinogram_size, v, &num_ckpt, num_rows, local_recon, row_indexes, true);
+                }else{
+                    v = 0;
+                }
                 for (int i = 0; i < num_rows; ++i) {
                     memcpy(local_data + i*dt*dx, data_swap+row_indexes[i]*dt*dx, sizeof(float)*dt*dx);
                 }
@@ -595,8 +599,12 @@ int main(int argc, char* argv[])
                     int v = progress;
                     // unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
                     unsigned int ckpt_id = removed_tasks[active_tasks*j + task_index];
-                    std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
-                    recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
+                    if (make_ckpt) {
+                        std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
+                        recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recovered_recon+recovered_size*sinogram_size, local_recovered_row_indexes+recovered_size);
+                    }else{
+                        v = 0;
+                    }
                     for (int k = 0; k < numread; ++k) {
                         local_ckpt_progress[recovered_size+k] = v;
                     }
