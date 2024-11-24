@@ -962,7 +962,7 @@ int main(int argc, char* argv[])
 
         if (ofile.is_open()) {
             ofile << "{" << std::endl;
-            ofile << "\"prob\" : " << failure_prob << "," << std::endl;
+            ofile << "\"failure_gaps\" : " << failure_prob << "," << std::endl;
             ofile << "\"nprocs\" : " << num_tasks << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
             ofile << "\"approach\" : " << "\"ckpt-sync-recovery\"" << "," << std::endl;
