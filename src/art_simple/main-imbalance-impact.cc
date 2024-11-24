@@ -515,7 +515,7 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if (restarted) {
+            if (restarted || enable_balance) {
                 // Gather the checkpoints at the root then redistribute across tasks
                 if (id == mpi_root) {
                     recovered_recon = new float [recon_size];
