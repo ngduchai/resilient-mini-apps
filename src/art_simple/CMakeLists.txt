@@ -23,7 +23,7 @@ add_executable(art_simple_onoff main-onoff.cc art_simple.cc)
 add_executable(art_simple_failure_impact main-failure-impact.cc art_simple.cc)
 add_executable(art_simple_data_balance main-data-balance.cc art_simple.cc)
 add_executable(art_simple_static_redis main-static-redis.cc art_simple.cc)
-add_executable(art_simple_failures art-simple-failures.cc art_simple.cc)
+add_executable(art_simple_failures main-fixed-failures.cc art_simple.cc)
 
 # Link the HDF5 library
 target_link_libraries(art_simple HDF5::HDF5 veloc-client MPI::MPI_CXX)
