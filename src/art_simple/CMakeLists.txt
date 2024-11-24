@@ -21,7 +21,7 @@ add_executable(art_simple_add_frames main-frame-add.cc art_simple.cc)
 add_executable(art_simple_ckpt_quality_analysis main-ckpt-quality-analysis.cc art_simple.cc)
 add_executable(art_simple_onoff main-onoff.cc art_simple.cc)
 add_executable(art_simple_failure_impact main-failure-impact.cc art_simple.cc)
-add_executable(art_simple_data_balance main-data-balance.cc art_simple.cc)
+add_executable(art_simple_sync_recovery main-sync-recovery.cc art_simple.cc)
 add_executable(art_simple_static_redis main-static-redis.cc art_simple.cc)
 add_executable(art_simple_failures main-fixed-failures.cc art_simple.cc)
 
@@ -33,7 +33,7 @@ target_link_libraries(art_simple_add_frames HDF5::HDF5 veloc-client MPI::MPI_CXX
 target_link_libraries(art_simple_ckpt_quality_analysis HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_onoff HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_failure_impact HDF5::HDF5 veloc-client MPI::MPI_CXX)
-target_link_libraries(art_simple_data_balance HDF5::HDF5 veloc-client MPI::MPI_CXX)
+target_link_libraries(art_simple_sync_recovery HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_static_redis HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_failures HDF5::HDF5 veloc-client MPI::MPI_CXX)
 
