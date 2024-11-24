@@ -38,11 +38,12 @@ def draw_heatmap(data, xticks, yticks, figpath):
     annot=True,
     fmt=".2f",
     cmap="cool",
+    vmin=0, vmax=2.5,
     xticklabels=xticks,
     yticklabels=yticks)
 
   plt.xlabel("Progress when failures happen")
-  plt.ylabel("Fraction of failure processes")
+  plt.ylabel("Fraction of failure tasks")
 
   plt.tight_layout()
   plt.savefig(figpath + ".png")
@@ -75,10 +76,10 @@ def plot_fig(data, baseline, figpath):
     total_times[fratio][fiter] = (exp["total"] - baseline["exec"]) / baseline["exec"]
 
   
-  draw_heatmap(ckpt_times, failure_iter_ticklabels, failure_ratios, figpath + "/ckpt_overhead")
-  draw_heatmap(sync_times, failure_iter_ticklabels, failure_ratios, figpath + "/sync_overhead")
-  draw_heatmap(compute_times, failure_iter_ticklabels, failure_ratios, figpath + "/exec_overhead")
-  draw_heatmap(total_times, failure_iter_ticklabels, failure_ratios, figpath + "/total_overhead")
+  draw_heatmap(ckpt_times, failure_iter_ticklabels, failure_ratios, figpath + "-ckpt_overhead")
+  draw_heatmap(sync_times, failure_iter_ticklabels, failure_ratios, figpath + "-sync_overhead")
+  draw_heatmap(compute_times, failure_iter_ticklabels, failure_ratios, figpath + "-exec_overhead")
+  draw_heatmap(total_times, failure_iter_ticklabels, failure_ratios, figpath + "-total_overhead")
 
 
 
@@ -101,7 +102,8 @@ if __name__ == "__main__":
 
   baseline = plotdata["baseline"]
 
-  plot_fig(plotdata["exp"], baseline, figpath)
+  plot_fig(plotdata["ckpt"], baseline, figpath + "/ckpt")
+  plot_fig(plotdata["no-resilient"], baseline, figpath + "/no-resilient")
   
   
 

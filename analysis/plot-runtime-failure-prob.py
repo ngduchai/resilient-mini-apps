@@ -164,14 +164,52 @@ if __name__ == "__main__":
   print("Plot runtime vs. mean time between failures varying # procs")
 
   precalculated_runtimes = {}
-  precalculated_runtimes[0] = [15360.0, 3840.0, 960.0, 240.0, 60.0]
-  precalculated_runtimes[0.0001] = [36208.84967684865, 6409.166514339338, 1487.30206372819, 361.4484777338541, 89.51053757096128]
-  precalculated_runtimes[0.001] = [4637158899.095492, 89681.69285024096, 3778.7936558865404, 590.5789751935984, 125.95471764301672]
-  precalculated_runtimes[0.01] = [10000100.711195493, 10000100.62457155, 5058946.069681379, 4061.0682538866236, 277.7976830045413]
+  # precalculated_runtimes[0] = [15360.0, 3840.0, 960.0, 240.0, 60.0]
+  # precalculated_runtimes[0.0001] = [36208.84967684865, 6409.166514339338, 1487.30206372819, 361.4484777338541, 89.51053757096128]
+  # precalculated_runtimes[0.001] = [4637158899.095492, 89681.69285024096, 3778.7936558865404, 590.5789751935984, 125.95471764301672]
+  # precalculated_runtimes[0.01] = [10000100.711195493, 10000100.62457155, 5058946.069681379, 4061.0682538866236, 277.7976830045413]
+  # precalculated_runtimes[0.1] = [10000010.435114441, 10000009.99814225, 10000010.365123235, 10000009.60292096, 24305.3363957242]
+  precalculated_runtimes[0] = {
+    1 : 15360.0,
+    4 : 3840.0,
+    16 : 960.0,
+    64 : 240.0,
+    256 : 60.0
+  }
+  precalculated_runtimes[0.0001] = {
+    1 : 36208.84967684865,
+    4 : 6409.166514339338,
+    16 : 1487.30206372819,
+    64 : 361.4484777338541,
+    256 : 89.51053757096128
+  }
+  precalculated_runtimes[0.001] = {
+    1 : 4637158899.095492,
+    4 : 89681.69285024096,
+    16 : 3778.7936558865404,
+    64 : 590.5789751935984,
+    256 : 125.95471764301672
+  }
+  precalculated_runtimes[0.01] = {
+    1 : 10000100.711195493,
+    4 : 10000100.62457155,
+    16 : 5058946.069681379,
+    64 : 4061.0682538866236,
+    256 : 277.7976830045413
+  }
+  precalculated_runtimes[0.1] = {
+    1 : 10000010.435114441, 
+    4 : 10000009.99814225,
+    16 : 10000010.365123235,
+    64 : 10000009.60292096,
+    256 : 24305.3363957242
+  }
 
   figpath = "figures/runtime/est-runtime-vs-mttf-varying-nprocs"
-  probs = [0, 0.0001, 0.001, 0.01, 0.1]
-  num_processes = [1, 4, 16, 64, 256]
+  # probs = [0, 0.0001, 0.001, 0.01, 0.1]
+  # num_processes = [1, 4, 16, 64, 256]
+  probs = [0.0001, 0.001, 0.01, 0.1]
+  num_processes = [1, 4, 16, 64]
   num_slices = 256
   num_iter = 10
   resolution = "640x640"
@@ -181,41 +219,51 @@ if __name__ == "__main__":
     slice_per_process = num_slices / num_process
     ideal_runtimes[num_process] = per_slice_runtime[resolution] * slice_per_process * num_iter
   for prob in probs:
-    if prob in precalculated_runtimes:
-      exp_runtimes[prob] = precalculated_runtimes[prob]
-    else:
-      exp_runtimes[prob] = []
-      for num_process in num_processes:
-        ideal_runtime = ideal_runtimes[num_process]
-        exp_runtime = simulate_no_resilient_runtime(prob, num_process, ideal_runtime)
-        # exp_runtime = exp_no_resilient_runtime(prob, num_process, ideal_runtime)
-        exp_runtimes[prob].append(exp_runtime)
+    # if prob in precalculated_runtimes:
+    #   exp_runtimes[prob] = precalculated_runtimes[prob]
+    #   continue
+    exp_runtimes[prob] = []
+    for num_process in num_processes:
+      if num_process in precalculated_runtimes[prob]:
+        exp_runtimes[prob].append(precalculated_runtimes[prob][num_process])
+        continue
+      ideal_runtime = ideal_runtimes[num_process]
+      exp_runtime = simulate_no_resilient_runtime(prob, num_process, ideal_runtime)
+      # exp_runtime = exp_no_resilient_runtime(prob, num_process, ideal_runtime)
+      exp_runtimes[prob].append(exp_runtime)
     for i in range(len(num_processes)):
       print(prob, num_processes[i], exp_runtimes[prob][i])
   
+  plt.rcParams['axes.labelsize'] = 14     # X and Y labels font size
+  plt.rcParams['xtick.labelsize'] = 14    # X-axis tick labels font size
+  plt.rcParams['ytick.labelsize'] = 14    # Y-axis tick labels font size
+  plt.rcParams['legend.fontsize'] = 14
+
   width = 0.15
   plt.figure()
+  # plt.figure(figsize=())
   m = -1.5
   x = np.array(range(len(num_processes)))
   for prob in probs:
     plabel = "No Failure"
     if prob != 0:
-      plabel = "MTTF = " + str(1/prob) + "s"
+      plabel = "MTTF = " + str(int(1/prob)) + "s"
     plt.bar(x + width*m, exp_runtimes[prob], width, facecolor="none", edgecolor=probs_colors[prob], hatch=probs_hatches[prob], label=plabel)
     m += 1
     print(prob, exp_runtimes[prob])
-  plt.plot(x, [ideal_runtimes[nproc] for nproc in num_processes], color="black", marker="o", label="Ideal Recon. Time")
+  plt.plot(x, [ideal_runtimes[nproc] for nproc in num_processes], color="black", marker="o", label="Ideal")
   plt.xlabel("Number of Reconstruction Tasks")
   plt.xticks(x, num_processes)
   # plt.ylabel("Normalized Reconstruction Time")
   plt.ylabel("Reconstruction Time (sec)")
-  plt.ylim(1, 10000000000)
+  plt.ylim(1, 10000000)
   plt.yscale("log")
   # plt.grid(which='major', color='black', linestyle='-', zorder=-1)   # Major grid
   # plt.grid(which='minor', color='gray', linestyle='--', linewidth=0.5, zorder=-1)   # Minor grid
 
 
-  plt.legend(loc="upper right")
+  # plt.legend(loc="upper right")
+  plt.legend(loc="lower left", ncol=2)
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")

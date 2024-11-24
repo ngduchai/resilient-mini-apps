@@ -289,14 +289,14 @@ int main(int argc, char* argv[])
     // std::vector<double> task_stop_thresholds = {210.968, 96.734, 194.45, 268.688, 21.9463, 188.592, 184.785, 9.77297, 11.4375, 59.2791};
     // std::vector<double> task_stop_thresholds = {210.968, 196.734, 194.45, 268.688, 21.9463, 188.592, 184.785, 9.77297, 11.4375, 59.2791};
     // std::vector<double> task_stop_thresholds = {1210.968, 1196.734, 1194.45, 1268.688, 1121.9463, 1188.592, 1184.785, 1119.77297, 1111.4375, 1159.2791};
-    std::vector<double> task_stop_thresholds = {10.5663, 151.73, 276.904, 25.1491};
-    // // Setup random number generation
-    // std::random_device rd;  // Seed generator
-    // std::mt19937 gen(rd()); // Mersenne Twister engine
-    // std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
-    // double task_stop_threshold = exp_dist(gen);
-    double task_stop_threshold = task_stop_thresholds[id];
-    std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
+    // std::vector<double> task_stop_thresholds = {10.5663, 151.73, 276.904, 25.1491};
+    // double task_stop_threshold = task_stop_thresholds[id];
+    // Setup random number generation
+    std::random_device rd;  // Seed generator
+    std::mt19937 gen(rd()); // Mersenne Twister engine
+    std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
+    double task_stop_threshold = exp_dist(gen);
+    // std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
 
     // std::vector<std::vector<int>> task_states = {
     //     {1, 0, 0, 1, 0, 0, 0, 1, 1, 1},
@@ -435,9 +435,9 @@ int main(int argc, char* argv[])
             for (int i = 0; i < num_tasks; ++i) {
                 active_tracker[i] = 1;
             }
-            // task_stop_threshold = exp_dist(gen);
-            std::vector<double> next_task_stop_thresholds = {186.601, 98.5418, 138.083, 97.1347};
-            task_stop_threshold = next_task_stop_thresholds[id];
+            task_stop_threshold = exp_dist(gen);
+            // std::vector<double> next_task_stop_thresholds = {186.601, 98.5418, 138.083, 97.1347};
+            // task_stop_threshold = next_task_stop_thresholds[id];
             std::cout << "[Task" << id << "] will stop in " << task_stop_threshold << " second(s)." << std::endl;
             std::chrono::duration<double> recon_progress = std::chrono::high_resolution_clock::now() - recon_start;
             task_stop_threshold += recon_progress.count();
