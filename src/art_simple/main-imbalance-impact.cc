@@ -103,7 +103,7 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
 int main(int argc, char* argv[])
 {
 
-    if(argc != 10) {
+    if(argc != 11) {
         std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <allow_restart> <failure_ratio> <enable_balance> [veloc config]" << std::endl;
         return 1;
     }
@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
     bool allow_restart = atoi(argv[8]) == 1 ? true : false;
     float failure_ratio = atof(argv[8]);
     bool enable_balance = atoi(argv[9]) == 1 ? true : false;
-    const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
+    const char* check_point_config = (argc == 11) ? argv[10] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
 
