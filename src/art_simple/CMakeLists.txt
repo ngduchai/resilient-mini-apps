@@ -25,6 +25,7 @@ add_executable(art_simple_sync_recovery main-sync-recovery.cc art_simple.cc)
 add_executable(art_simple_static_redis main-static-redis.cc art_simple.cc)
 add_executable(art_simple_failures main-fixed-failures.cc art_simple.cc)
 add_executable(art_simple_imbalance_impact main-imbalance-impact.cc art_simple.cc)
+add_executable(art_simple_sync_recovery_imbalance main-sync-recovery-imbalance.cc art_simple.cc)
 
 # Link the HDF5 library
 target_link_libraries(art_simple HDF5::HDF5 veloc-client MPI::MPI_CXX)
@@ -38,5 +39,6 @@ target_link_libraries(art_simple_sync_recovery HDF5::HDF5 veloc-client MPI::MPI_
 target_link_libraries(art_simple_static_redis HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_failures HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_imbalance_impact HDF5::HDF5 veloc-client MPI::MPI_CXX)
+target_link_libraries(art_simple_sync_recovery_imbalance HDF5::HDF5 veloc-client MPI::MPI_CXX)
 
 

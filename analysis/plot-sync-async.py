@@ -106,6 +106,8 @@ if __name__ == "__main__":
     axfailure.plot(x, plot_failures[approach], color=approach_failure_colors[approach], label=approach_labels[approach] + " (# Failures)", marker=approach_failure_markers[approach])
     m += 1
   
+  plt.xticks(x, time_bw_failues)
+  
   # plt.ylabel("Elapsed time (s)")
   
   fig.legend(bbox_to_anchor=[0.15, 0.95], loc="upper left")
