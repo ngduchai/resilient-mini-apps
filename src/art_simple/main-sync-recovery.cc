@@ -283,11 +283,11 @@ int main(int argc, char* argv[])
     // }
 
     // Setup random number generation
-    // std::random_device rd;  // Seed generator
-    // std::mt19937 gen(rd()); // Mersenne Twister engine
-    // std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
-    // double task_stop_threshold = exp_dist(gen);
-    double task_stop_threshold = failure_prob * (num_tasks - id);
+    std::random_device rd;  // Seed generator
+    std::mt19937 gen(rd()); // Mersenne Twister engine
+    std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
+    double task_stop_threshold = exp_dist(gen);
+    // double task_stop_threshold = failure_prob * (num_tasks - id);
     std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
 
     // std::vector<std::vector<int>> task_states = {
@@ -427,8 +427,8 @@ int main(int argc, char* argv[])
                 std::cout << "ALL TASKS HAVE STOPPED. RESTART ALL THE RECONSTRUCTION TASKS" << std::endl;
             }
             task_is_active = 1;
-            // task_stop_threshold = exp_dist(gen);
-            double task_stop_threshold = failure_prob * (num_tasks - id);
+            task_stop_threshold = exp_dist(gen);
+            // double task_stop_threshold = failure_prob * (num_tasks - id);
             std::cout << "[Task" << id << "] will stop in " << task_stop_threshold << " second(s)." << std::endl;
             std::chrono::duration<double> recon_progress = std::chrono::high_resolution_clock::now() - recon_start;
             task_stop_threshold += recon_progress.count();
