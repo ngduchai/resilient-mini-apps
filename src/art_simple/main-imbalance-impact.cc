@@ -743,7 +743,7 @@ int main(int argc, char* argv[])
             // art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
             float * ws_data = local_data + (num_rows - ws)*dt*dx;
             float * ws_local_recon = local_recon + (num_rows-ws)*sinogram_size;
-            art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+            // art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
             for (int i = num_rows-ws; i < num_rows; ++i) {
                 local_progress[i]++; 
             }
@@ -847,7 +847,9 @@ int main(int argc, char* argv[])
             ofile << "\"enable_balance\" : " << (enable_balance ? 1 : 0) << "," << std::endl;
             ofile << "\"nprocs\" : " << num_tasks << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
-            ofile << "\"approach\" : " << "\"static-redis\"" << "," << std::endl;
+            ofile << "\"min_rows\" : " << min_rows << "," << std::endl;
+            ofile << "\"max_rows\" : " << max_rows << "," << std::endl;
+            ofile << "\"approach\" : " << "\"imbalance-impact\"" << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
             ofile << "\"filename\" : \"" << filename << "\"," << std::endl;
