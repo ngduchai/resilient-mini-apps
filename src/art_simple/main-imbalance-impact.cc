@@ -753,6 +753,15 @@ int main(int argc, char* argv[])
 
     }
 
+    int min_rows, max_rows;
+    int local_min_rows = task_is_active == 1 ? num_rows : dy+1000;
+    int local_max_rows = task_is_active == 1 ? num_rows : -1;  
+    MPI_Reduce(&local_min_rows, &min_rows, 1, MPI_INT, MPI_MIN, mpi_root, MPI_COMM_WORLD);
+    MPI_Reduce(&local_max_rows, &max_rows, 1, MPI_INT, MPI_MAX, mpi_root, MPI_COMM_WORLD);
+    if (id == mpi_root) {
+        std::cout << "[Task " << id << "] Gap balance: min = " << min_rows << ", max = " << max_rows << " --> balance: " << max_rows-min_rows << std::endl;
+    }
+
     std::cout << "[Task " << id << "] Complete the reconstruction, waiting for other..." << std::endl;
 
     std::string state_info = "[";
