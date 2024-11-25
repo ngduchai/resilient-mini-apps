@@ -84,6 +84,8 @@ def plot_fig(data, baseline, figpath):
 
 
 if __name__ == "__main__":
+
+  # python plot-failure-impact.py data/execinfo-failure-impact.json figures/failure-impact
   
   if len(sys.argv) < 3:
     print("Usage: python plot-time.py <data file> <fig folder>")

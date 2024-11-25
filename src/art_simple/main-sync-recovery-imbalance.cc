@@ -617,8 +617,8 @@ int main(int argc, char* argv[])
             float * recovered_recon = nullptr;
             int * recovered_row_indexes = nullptr;
             int * ckpt_progress = nullptr;
-            int * collected_recovered_rows = nullptr;
-            int * displacements = nullptr;
+            // int * collected_recovered_rows = nullptr;
+            // int * displacements = nullptr;
             float * local_recovered_recon = new float [recon_size];
             int * local_recovered_row_indexes = new int [dy];
             int * local_ckpt_progress = new int [dy];
@@ -895,7 +895,7 @@ int main(int argc, char* argv[])
             ofile << "\"failure_gaps\" : " << failure_prob << "," << std::endl;
             ofile << "\"nprocs\" : " << num_tasks << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
-            ofile << "\"approach\" : " << "\"ckpt-sync-recovery\"" << "," << std::endl;
+            ofile << "\"approach\" : " << "\"ckpt-sync-recovery-imbalance\"" << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;
             ofile << "\"filename\" : \"" << filename << "\"," << std::endl;

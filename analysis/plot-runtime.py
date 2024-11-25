@@ -5,8 +5,6 @@ import numpy as np
 import sys
 import json
 
-import pandas as pd
-
 import pickle
 
 import matplotlib.pyplot as plt
@@ -80,7 +78,7 @@ def simulate_no_resilient_runtime(lamb, num_processes, runtime):
   return act_runtime
 
 def simulate_no_resilient_resume_runtime(lamb, num_processes, runtime):
-  ntries = 1000
+  ntries = 10
   total_tries = 0
   if lamb == 0:
     lamb = 0.00000000001
@@ -165,7 +163,7 @@ def plot_fig(data, probs, figpath):
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
 
-def plot_resilient(data, probs, figpath, normalized_value=1):
+def plot_totaltime(data, probs, figpath, normalized_value=1):
   width = 0.15
   # plt.figure(figsize=(10, 6))
   lapp = None
@@ -173,8 +171,8 @@ def plot_resilient(data, probs, figpath, normalized_value=1):
     if lapp == None or len(data[approach]["elapsed-time"]) > len(data[lapp]["elapsed-time"]):
       lapp = approach
   plt.figure()
-  m = 0
-  approaches = ["no-resilient", "veloc", "veloc-dynamic"]
+  m = -1.5
+  approaches = ["no-resilient", "ckpt", "balance", "async"]
   # for approach in data:
   for approach in approaches:
     appconf = data[approach]
@@ -192,156 +190,19 @@ def plot_resilient(data, probs, figpath, normalized_value=1):
     m += 1
   plt.xlabel("Mean Time to Failure (sec)")
   plt.xticks(np.arange(len(probs)), 1/np.array(probs))
-  # plt.ylabel("Reconstrucution Time (sec)")
-  plt.ylabel("Normalized Reconstruction Time")
-  # plt.yscale("log")
-  # plt.ylim(0, 31536000) # A year
-  plt.ylim(0, 20) # A year
-  
-  # plt.legend(loc="best")
-  plt.tight_layout()
-  plt.savefig(figpath + ".png")
-  plt.savefig(figpath + ".pdf")
-
-def plot_breakdown(data, figpath, approach, normalized_value=1):
-  width = 0.15
-  # plt.figure(figsize=(10, 6))
-  times = ["ckpt", "comm", "exec"]
-  colors = {
-    "exec" : "orange",
-    "ckpt" : "blue",
-    "comm" : "green"
-  }
-  labels = {
-    "exec" : "Execution",
-    "ckpt" : "Checkpointing",
-    "comm" : "Data Redistribution"
-  }
-  
-  probs = []
-  mtimes = {}
-  for time in times:
-    mtimes[time] = []
-  for info in data[approach]["elapsed-time"]:
-    probs.append(info["prob"])
-    for time in times:
-      mtimes[time].append(info[time])
-    
-  plt.figure()
-  x = np.arange(len(probs))
-  m=0
-  for time in times:
-    plt.bar(x + width*m, np.array(mtimes[time])/normalized_value, width, facecolor="none", edgecolor=colors[time], hatch="//", label=labels[time])
-    print(time, np.array(mtimes[time])/normalized_value)
-    m += 1
-  plt.xlabel("Mean Time to Failure (sec)")
-  plt.xticks(np.arange(len(probs)), 1/np.array(probs))
-  if normalized_value == 1:
+  if normalized_value != 1:
     plt.ylabel("Reconstrucution Time (sec)")
+    plt.ylim(1, 20) # A year
   else:
-    plt.ylabel("Normalized Elapsed Time")
+    plt.ylabel("Normalized Reconstruction Time")
+    plt.ylim(1, 31536000) # A year
   plt.yscale("log")
-  # plt.ylim(0, 31536000) # A year
-  # plt.ylim(0, 20) # A year
   
-  # plt.legend(loc="best")
+  
+  plt.legend(loc="best")
   plt.tight_layout()
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
-
-def plot_clustered_stacked(figpath, varied_unit, dfall, labels=None,  hashes="/", **kwargs):
-    """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
-labels is a list of the names of the dataframe, used for the legend
-title is a string for the title of the plot
-H is the hatch used for identification of the different dataframe"""
-    plt.figure()
-    n_df = len(dfall)
-    n_col = len(dfall[0].columns) 
-    n_ind = len(dfall[0].index)
-    axe = plt.subplot(111)
-
-    for df in dfall : # for each data frame
-        axe = df.plot(kind="bar",
-                      linewidth=0,
-                      stacked=True,
-                      ax=axe,
-                      legend=False,
-                      grid=False,
-                      **kwargs)  # make bar plots
-
-    h,l = axe.get_legend_handles_labels() # get the handles we want to modify
-    for i in range(0, n_df * n_col, n_col): # len(h) = n_col * n_df
-        for j, pa in enumerate(h[i:i+n_col]):
-            for rect in pa.patches: # for each index
-                rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
-                # rect.set_hatch(H * int(i / n_col)) #edited part     
-                rect.set_hatch(hashes[int(i / n_col)]) #edited part     
-                rect.set_width(1 / float(n_df + 1))
-
-    axe.set_xticks((np.arange(0, 2 * n_ind, 2) + 1 / float(n_df + 1)) / 2.)
-    axe.set_xticklabels(df.index, rotation = 0)
-
-    # Add invisible data to add another legend
-    n=[]        
-    for i in range(n_df):
-        n.append(axe.bar(0, 0, color="none", hatch=hashes[i]))
-
-    l1 = axe.legend(h[:n_col], l[:n_col], loc=[0.01, 0.7])
-    if labels is not None:
-        l2 = plt.legend(n, labels, loc=[0.01, 0.4]) 
-    axe.add_artist(l1)
-    axe.set_ylim([0, 2000])
-
-    axe.set_ylabel("Reconstruction Time (sec)")
-    axe.set_xlabel(varied_unit)
-
-    plt.tight_layout()
-    plt.savefig(figpath + ".png")
-    plt.savefig(figpath + ".pdf")
-
-    return axe
-
-def plot_resilient_breakdown(data, varied_param, fixed_params, figpath, normalized_value=1):
-  width = 0.15
-  # plt.figure(figsize=(10, 6))
-  plt.figure()
-  m = 0
-  approaches = ["no-resilient", "veloc", "veloc-dynamic"]
-  hatches = {
-    "comp" : "//",
-    "comm" : "+",
-    "comm" : "\\"
-  }
-  total_times = {}
-  for approach in approaches:
-    appconf = data[approach]
-    appdata = data[approach]["elapsed-time"]
-    total = []
-    comp = []
-    comm = []
-    ckpt = []
-    for vvalue in varied_param["values"]:
-      for info in appdata:
-        if vvalue == info[varied_param["key"]]:
-          found = True
-          for fixed_param in fixed_params:
-            if info[fixed_param] != info[fixed_param]:
-              found = False
-              break
-          if found:
-            total.append(info["total"])
-            comp.append(info["exec"])
-            comm.append(info["comm"])
-            ckpt.append(info["ckpt"])
-            break
-
-    print(varied_param["labels"])      
-    print(comp)
-    total_times[approach] = pd.DataFrame(np.array([ckpt, comm, comp]).transpose(), index=varied_param["labels"], columns=["Checkpoint", "Communicate", "Compute"])
-
-  plot_clustered_stacked(figpath, varied_param["xlabel"], list(total_times.values()), ["No Resilient", "+Ckpt", "+Ckpt +Dynamic Redist"], hashes=["", "//", "o"])
-  
-
 
 if __name__ == "__main__":
   
@@ -374,108 +235,27 @@ if __name__ == "__main__":
   plt.rcParams['xtick.labelsize'] = 16    # X-axis tick labels font size
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
   plt.rcParams['legend.fontsize'] = 16
-
-  # probs = [0, 0.005, 0.01, 0.02, 0.05, 0.1]
-  # plot_fig(plotdata["exp_failure"], probs, figpath + "/elapsed-time-no-retry")
-  # # plot_fig(plotdata["with-retries"], probs, figpath + "/elapsed-time-with-retry")
   
   # Calculate runtime for no resilient implementation
   no_resilience = {}
   no_resilience["label"] = "No Resilience"
   no_resilience["color"] = "orange"
   no_resilience["elapsed-time"] = []
-  ideal_exec_time = 5.99935 # Processing time of 1 slice in 1 iteration
-  print("Generate no resilient runtime")
+
+  ideal_exec_time = plotdata["baseline"]["total"]
   probs = [0, 0.0001, 0.001, 0.01, 0.1]
-  num_iters = [10, 20, 30, 40, 50]
-  nprocs = [1, 2, 4, 8, 16, 32, 64]
   for prob in probs:
     info = {}
     info["prob"] = prob
-    info["nprocs"] = 64
-    info["num_iter"] = 10
-    info["total"] = exp_no_resilient_runtime(prob, 64, 10*ideal_exec_time)
+    info["total"] = exp_no_resilient_runtime(prob, 64, ideal_exec_time)
     # info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
-    info["exec"] = info["total"]
-    info["comm"] = 0
-    info["ckpt"] = 0
-    info["recover"] = 0
     no_resilience["elapsed-time"].append(info)
-  for num_iter in num_iters:
-    info = {}
-    info["prob"] = 0.01
-    info["nprocs"] = 64
-    info["num_iter"] = num_iter
-    info["total"] = exp_no_resilient_runtime(0.01, 64, num_iter*ideal_exec_time)
-    # info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
-    info["exec"] = info["total"]
-    info["comm"] = 0
-    info["ckpt"] = 0
-    info["recover"] = 0
-    no_resilience["elapsed-time"].append(info)
-  for nproc in nprocs:
-    info = {}
-    info["prob"] = 0.01
-    info["nprocs"] = nproc
-    info["num_iter"] = 10
-    info["total"] = exp_no_resilient_runtime(0.01, 64, 64/nproc*10*ideal_exec_time)
-    # info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
-    info["exec"] = info["total"]
-    info["comm"] = 0
-    info["ckpt"] = 0
-    info["recover"] = 0
-    no_resilience["elapsed-time"].append(info)
-  plotdata["with-retries"]["no-resilient"] = no_resilience
   print(no_resilience)
-  # normalized_value = ideal_exec_time
-  print(ideal_exec_time)
-  # normalized_value=59.682124539
-  # plot_resilient(plotdata["with-retries"], probs, figpath + "/elapsed-time-resilient", normalized_value)
-  # # normalized_value=59.682124539
-  # normalized_value=1
-  # plot_breakdown(plotdata["with-retries"], figpath + "/elapsed-time-breakdown", "veloc-dynamic", normalized_value)
+  plotdata["approaches"]["no-resilient"] = no_resilience
 
-  normalized_value = 1
+  plot_totaltime(plotdata["approaches"], probs, figpath + "/elapsed-time-resilient")
+  
 
-  # Varying failure rate
-  plot_resilient_breakdown(
-    plotdata["with-retries"],
-    {
-      "key" : "prob",
-      "values" : probs,
-      "labels" : 1/np.array(probs),
-      "xlabel" : "Mean time to Failure (sec)"
-    },
-    {"nprocs": 64, "num_iter": 10},
-    figpath + "/elapsed-time-varying-mttf",
-    normalized_value
-  )
-  # Varying number of iterations
-  plot_resilient_breakdown(
-    plotdata["with-retries"],
-    {
-      "key" : "num_iter",
-      "values" : num_iters,
-      "labels" : num_iters,
-      "xlabel" : "Number of iteration"
-    },
-    {"nprocs": 64, "prob": 0.01},
-    figpath + "/elapsed-time-varying-iter",
-    normalized_value
-  )
-  # Varying number of tasks
-  plot_resilient_breakdown(
-    plotdata["with-retries"],
-    {
-      "key" : "nprocs",
-      "values" : nprocs,
-      "labels" : nprocs,
-      "xlabel" : "Number of reconstruction tasks"
-    },
-    {"prob": 0.01, "num_iter": 10},
-    figpath + "/elapsed-time-varying-np",
-    normalized_value
-  )
  
 
 

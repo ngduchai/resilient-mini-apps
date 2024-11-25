@@ -17,6 +17,8 @@ import math
 
 if __name__ == "__main__":
 
+  # python plot-imbalance-impact.py data/execinfo-imbalance-impact.json figures/imbalance-impact
+
   plt.rcParams['axes.labelsize'] = 16     # X and Y labels font size
   plt.rcParams['xtick.labelsize'] = 16    # X-axis tick labels font size
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size

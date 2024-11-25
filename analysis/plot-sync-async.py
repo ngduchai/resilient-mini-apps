@@ -17,6 +17,8 @@ import math
 
 if __name__ == "__main__":
 
+  # python plot-sync-async.py data/execinfo-failure-fixed-impact.json figures/failure-impact
+
   plt.rcParams['axes.labelsize'] = 16     # X and Y labels font size
   plt.rcParams['xtick.labelsize'] = 16    # X-axis tick labels font size
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
