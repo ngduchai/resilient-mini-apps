@@ -41,8 +41,8 @@ if __name__ == "__main__":
     "async" : "o"
   }
   approach_labels = {
-    "sync" : "Sync",
-    "async" : "Async"
+    "sync" : "Immediate",
+    "async" : "Lazy"
   }
 
   if len(sys.argv) < 3:
@@ -107,6 +107,8 @@ if __name__ == "__main__":
     axtime.bar(x + width*m, plot_times[approach], width=width, facecolor="none", edgecolor=approach_colors[approach], hatch=appraoch_hatches[approach], label=approach_labels[approach] + " (Time)")
     axfailure.plot(x, plot_failures[approach], color=approach_failure_colors[approach], label=approach_labels[approach] + " (# Failures)", marker=approach_failure_markers[approach])
     m += 1
+
+  # print(np.array(plot_times["sync"])/np.array([plot_times["async"]]))
   
   plt.xticks(x, time_bw_failues)
   

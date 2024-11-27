@@ -16,6 +16,8 @@ import scipy.stats as stats
 
 if __name__ == "__main__":
 
+# python plot-load-balancing.py data/load-balancing.json figures/load-balancing
+
   if len(sys.argv) < 3:
     print("Usage: python plot-time.py <data file> <fig folder>")
     sys.exit(1)
@@ -38,6 +40,7 @@ if __name__ == "__main__":
       total_times[approach][nps] = info["total"]
   
   nprocs = sorted(list(nprocs), reverse=True)
+  nprocs = nprocs[1:] # Collect data for failures only
   plot_total_times = {}
   for approach in plotdata:
     plot_times = []

@@ -108,6 +108,8 @@ if __name__ == "__main__":
     axtime.bar(x + width*m, plot_times[approach], width=width, facecolor="none", edgecolor=approach_colors[approach], hatch=appraoch_hatches[approach], label=approach_labels[approach] + " (Time)")
     axbalance.plot(x, plot_balances[approach], color=approach_balance_colors[approach], label=approach_labels[approach] + " (Balance)", marker=approach_balance_markers[approach])
     m += 1
+  
+  print(np.array(plot_times["naive"])/np.array(plot_times["balance-aware"]))
 
   plt.xticks(x, failure_ratios)
 

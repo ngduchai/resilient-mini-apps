@@ -161,6 +161,14 @@ if __name__ == "__main__":
   #     print(num_proc, lamb, exp_no_resilient_runtime(lamb, num_proc, runtime), simulate_no_resilient_runtime(lamb, num_proc, runtime))
   # exit(0)
 
+  probs = [0.0001, 0.001, 0.01, 0.1]
+  for prob in probs:
+    num_process = 64
+    ideal_runtime = 60
+    actual_runtime = simulate_no_resilient_runtime(prob, num_process, ideal_runtime)
+    print(num_process, prob, actual_runtime)
+  exit(0)
+
   print("Plot runtime vs. mean time between failures varying # procs")
 
   precalculated_runtimes = {}
