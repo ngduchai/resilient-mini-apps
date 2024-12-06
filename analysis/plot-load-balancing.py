@@ -57,18 +57,49 @@ if __name__ == "__main__":
   plt.rcParams['ytick.labelsize'] = 16    # Y-axis tick labels font size
   plt.rcParams['legend.fontsize'] = 16
 
-  plt.figure()
+  # plt.figure()
+  # width = 0.15
+  # x = np.arange(len(nprocs))
+  # m=0
+  # approaches = ["static"]
+  # balance_factor = (np.round(10/nprocs) - 1)
+
+  # for approach in approaches:
+  #   print(plot_total_times[approach])
+  #   plt.bar(x + width*m, plot_total_times[approach], width, facecolor="none", edgecolor=plotdata[approach]["color"], hatch="//", label=plotdata[approach]["label"])
+  #   m += 1
+  # plt.xlabel("# Remaining Processes")
+  # plt.xticks(x, nprocs)
+  # plt.ylabel("Elapsed time (s)")
+  # # plt.yscale("log")
+  
+  # # plt.legend(loc="best")
+  # plt.tight_layout()
+  # plt.savefig(figpath + "/load-balancing-scaling.png")
+  # plt.savefig(figpath + "/load-balancing-scaling.pdf")
+
+  fig, axtime = plt.subplots()
   width = 0.15
   x = np.arange(len(nprocs))
   m=0
   approaches = ["static"]
+  balance_factor = (np.ceil(10/np.array(nprocs)) - np.floor(10/np.array(nprocs))) / np.ceil(10/np.array(nprocs))
+  print(balance_factor)
+  balance_color = "green"
+
+  axtime.set_xlabel("# Remaining Processes")
+  axtime.set_ylabel("Elapsed time (s)")
+  # axbalance = axtime.twinx()
+  # axbalance.set_ylabel("Balance", color=balance_color)
+  # axbalance.tick_params(axis="y", labelcolor=balance_color)
+  
+  
+  # axbalance.plot(x, balance_factor, color=balance_color, marker="o")
   for approach in approaches:
     print(plot_total_times[approach])
-    plt.bar(x + width*m, plot_total_times[approach], width, facecolor="none", edgecolor=plotdata[approach]["color"], hatch="//", label=plotdata[approach]["label"])
+    axtime.bar(x + width*m, plot_total_times[approach], width, facecolor="none", edgecolor=plotdata[approach]["color"], hatch="//", label=plotdata[approach]["label"])
     m += 1
-  plt.xlabel("# Remaining Processes")
   plt.xticks(x, nprocs)
-  plt.ylabel("Elapsed time (s)")
   # plt.yscale("log")
   
   # plt.legend(loc="best")

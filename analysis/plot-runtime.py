@@ -190,9 +190,9 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
     m += 1
   plt.xlabel("Mean Time to Failure (sec)")
   plt.xticks(np.arange(len(probs)), 1/np.array(probs))
-  if normalized_value != 1:
+  if normalized_value == 1:
     plt.ylabel("Reconstrucution Time (sec)")
-    plt.ylim(1, 20) # A year
+    plt.ylim(1, 200000) # A year
   else:
     plt.ylabel("Normalized Reconstruction Time")
     # plt.ylim(1, 31536000) # A year
@@ -207,6 +207,8 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
   plt.savefig(figpath + ".pdf")
 
 if __name__ == "__main__":
+
+  # python plot-runtime.py data/runtime-test.json figures/runtime
   
   # lamb = 0.002
   # num_processes = 64
