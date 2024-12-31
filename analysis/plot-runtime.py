@@ -156,7 +156,8 @@ def plot_overhead(data, probs, figpath, normalized_value=1):
   plt.bar(x+width, comm_times, width, facecolor="none", edgecolor="blue", hatch="\\", label="Communication")
   
   plt.xlabel("Mean Time to Failure (sec)")
-  plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  plt.xticks(np.arange(len(probs)), ["$\infty$" if prob == 0 else int(round(1/prob)) for prob in probs])
   plt.ylabel("Normalized Elapsed Time")
   plt.yscale("log")
   plt.ylim((0, 100))
@@ -189,7 +190,8 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
     print(total/normalized_value)
     m += 1
   plt.xlabel("Mean Time to Failure (sec)")
-  plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  plt.xticks(np.arange(len(probs)), ["$\infty$" if prob == 0 else int(round(1/prob)) for prob in probs])
   if normalized_value == 1:
     plt.ylabel("Reconstrucution Time (sec)")
     plt.ylim(1, 200000) # A year
