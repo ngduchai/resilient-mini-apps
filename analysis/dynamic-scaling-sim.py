@@ -259,18 +259,18 @@ def compute_success_prob(deadline, mu, lamb, num_added, num_failures, safe_capac
     conv_prob, conv_t, conv_pdf = compute_success_prob_convolve(deadline, mu, lamb, num_added, num_failures, safe_capacity)
     apprx_prob, apprx_t, apprx_pdf = compute_success_prob_gaussian_approx(deadline, mu, lamb, num_added, num_failures, safe_capacity)
 
-    # Plot the original and summed distributions
-    print(safe_capacity-deadline*num_failures)
-    plt.figure(figsize=(10, 6))
-    plt.plot(conv_t, conv_pdf, label=f"Conv", linestyle="--")
-    plt.plot(apprx_t, apprx_pdf, label=f"Approx", linestyle="-")
-    plt.axvline(x=safe_capacity-deadline*num_failures, color="black", linestyle=":")
-    plt.xlabel("t")
-    plt.ylabel("PDF")
-    plt.legend()
-    plt.grid()
-    plt.show()
-    plt.savefig("figures/scaling/estimate-compute.png")
+    # # Plot the original and summed distributions
+    # print(safe_capacity-deadline*num_failures)
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(conv_t, conv_pdf, label=f"Conv", linestyle="--")
+    # plt.plot(apprx_t, apprx_pdf, label=f"Approx", linestyle="-")
+    # plt.axvline(x=safe_capacity-deadline*num_failures, color="black", linestyle=":")
+    # plt.xlabel("t")
+    # plt.ylabel("PDF")
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+    # plt.savefig("figures/scaling/estimate-compute.png")
 
     success_prob = conv_prob
 
@@ -314,15 +314,15 @@ def configure_dynamic_scaling(target_success, mu, num_procs, comp_unit, num_iter
     return num_sinograms-num_procs
 
 
-deadline = 10
-mu = 0.1
-lamb = 0.001
-num_added = 8
-num_failures = 8
-safe_capacity = 60
-prob = compute_success_prob(deadline, mu, lamb, num_added, num_failures, safe_capacity)
-print(prob)
-exit(0)
+# deadline = 10
+# mu = 0.1
+# lamb = 0.001
+# num_added = 8
+# num_failures = 8
+# safe_capacity = 60
+# prob = compute_success_prob(deadline, mu, lamb, num_added, num_failures, safe_capacity)
+# print(prob)
+# exit(0)
 
 comp_unit = 6
 num_iter = 10
