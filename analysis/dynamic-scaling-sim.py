@@ -326,7 +326,7 @@ def configure_dynamic_scaling(target_success, mu, num_procs, comp_unit, num_iter
 
 comp_unit = 6
 num_iter = 10
-num_sinograms = 32
+num_sinograms = 64
 deadline = 120
 lamb = 0.001
 mu = 0.1
@@ -335,22 +335,24 @@ ckpt_period = comp_unit
 target_success = 0.9999
 num_procs = int(num_sinograms / 4)
 
-# new_procs = 8
-# estimate_dynamic_scaling_success(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-# exit(0)
+# # new_procs = 8
+# # estimate_dynamic_scaling_success(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+# # exit(0)
 
-for new_procs in range(1, num_sinograms-num_procs+1):
-    print("total_procs (num_procs + new_procs) =", num_procs+new_procs, "(", num_procs, "+", new_procs, ") ------------------------------ ")
-    print("Estimation", estimate_dynamic_scaling_success(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period))
-    _, success_rate = dynamic_scaling_sim(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-    print("Simulation", success_rate)
+# for new_procs in range(1, num_sinograms-num_procs+1):
+#     print("total_procs (num_procs + new_procs) =", num_procs+new_procs, "(", num_procs, "+", new_procs, ") ------------------------------ ")
+#     print("Estimation", estimate_dynamic_scaling_success(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period))
+#     _, success_rate = dynamic_scaling_sim(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+#     print("Simulation", success_rate)
 
 
-new_procs = configure_dynamic_scaling(target_success, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-print("total_procs (num_procs + new_procs) =", num_procs+new_procs, "(", num_procs, "+", new_procs, ")")
-runtime, success_rate = dynamic_scaling_sim(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-print("runtime", runtime, "deadline", deadline, "target", target_success)
-print("success_rate", success_rate)
+# new_procs = configure_dynamic_scaling(target_success, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+# print("total_procs (num_procs + new_procs) =", num_procs+new_procs, "(", num_procs, "+", new_procs, ")")
+# runtime, success_rate = dynamic_scaling_sim(new_procs, mu, num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+# print("runtime", runtime, "deadline", deadline, "target", target_success)
+# print("success_rate", success_rate)
+
+
 
 
     
