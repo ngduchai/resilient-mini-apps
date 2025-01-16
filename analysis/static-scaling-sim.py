@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 def scaling_sim(num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period):
     
     num_tries = 1000
+    # num_tries = 10000
 
     total_runtime = 0
     num_success = 0
@@ -109,7 +110,8 @@ def configure_scaling(target_success, comp_unit, num_iter, num_sinograms, deadli
     return num_sinograms
 
 def examine_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period):
-    for num_procs in range(int(num_sinograms/2), num_sinograms+1):
+    for num_procs in range(int(num_sinograms/4), num_sinograms+1):
+    # for num_procs in range(int(num_sinograms/2), num_sinograms+1):
         _, success_prob = scaling_sim(num_procs, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
         if success_prob >= target_success:
             return num_procs
@@ -149,12 +151,13 @@ deadline = (comp_unit * num_iter) * slack
 ckpt_period = comp_unit
 target_success = 0.9999
 
-lambs = [0, 0.0001, 0.001, 0.01, 0.1]
+lambs = [0, 0.0001, 0.001, 0.01]
 est_required_procs = []
 sim_required_procs = []
 for lamb in lambs:
     est_num_procs = configure_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
     sim_num_procs = examine_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+    print(lamb, est_num_procs, sim_num_procs)
     est_required_procs.append(est_num_procs)
     sim_required_procs.append(sim_num_procs)
 
@@ -176,23 +179,27 @@ plt.savefig("figures/scaling/static-resource-mttf.png")
 
 exit(0)
 
+
 # Varying slack -----------------------------------------------------------------
 comp_unit = 6
 num_iter = 10
 num_sinograms = 64
-slacks = np.arange(1.1, 3.1, 0.1)
+slacks = np.arange(1.2, 5.1, 0.2)
 lamb = 0.001
 ckpt_period = comp_unit
 target_success = 0.9999
 
-est_required_procs = []
-sim_required_procs = []
-for slack in slacks:
-    deadline = (comp_unit * num_iter) * slack
-    est_num_procs = configure_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-    sim_num_procs = examine_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
-    est_required_procs.append(est_num_procs)
-    sim_required_procs.append(sim_num_procs)
+
+est_required_procs = [63, 55, 49, 45, 41, 39, 36, 34, 33, 31, 30, 29, 28, 27, 27, 26, 26, 25, 25, 24]
+sim_required_procs = [61, 53, 49, 43, 39, 38, 34, 31, 31, 29, 28, 26, 25, 25, 23, 23, 22, 22, 20, 20]
+# est_required_procs = []
+# sim_required_procs = []
+# for slack in slacks:
+#     deadline = (comp_unit * num_iter) * slack
+#     est_num_procs = configure_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+#     sim_num_procs = examine_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+#     est_required_procs.append(est_num_procs)
+#     sim_required_procs.append(sim_num_procs)
 
 print(slacks)
 print(est_required_procs)
@@ -200,13 +207,54 @@ print(sim_required_procs)
 
 plt.figure()
 width=0.25
-plt.plot(slacks-1, est_required_procs, label="Estimation", color="blue")
-plt.plot(slacks-1, sim_required_procs, label="Simulation", color="orange")
-plt.xlabel("Slack/Ideal Runtime")
+# plt.plot(slacks-1, est_required_procs, label="Estimation", color="blue")
+# plt.plot(slacks-1, sim_required_procs, label="Simulation", color="orange")
+# plt.xlabel("Slack/Ideal Runtime")
+plt.plot(slacks, est_required_procs, label="Estimation", color="blue")
+plt.plot(slacks, sim_required_procs, label="Simulation", color="orange")
+plt.xlabel("Deadline/Ideal Runtime")
 plt.ylabel("Required processes")
 plt.legend()
 plt.grid()
 plt.savefig("figures/scaling/static-resource-slack.png")
+
+exit(0)
+
+# Varying target success rate ----------------------------------------------------
+comp_unit = 6
+num_iter = 10
+num_sinograms = 64
+slack = 2
+deadline = (comp_unit * num_iter) * slack 
+lamb = 0.001
+ckpt_period = comp_unit
+
+# target_successes = [0.9, 0.99, 0.999, 0.9999, 0.99999, 0.999999]
+target_successes = [0.9, 0.99, 0.999, 0.9999, 0.99999]
+est_required_procs = []
+sim_required_procs = []
+for target_success in target_successes:
+    est_num_procs = configure_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+    sim_num_procs = examine_scaling(target_success, comp_unit, num_iter, num_sinograms, deadline, lamb, ckpt_period)
+    print(target_success, est_num_procs, sim_num_procs)
+    est_required_procs.append(est_num_procs)
+    sim_required_procs.append(sim_num_procs)
+
+print(target_successes)
+print(est_required_procs)
+print(sim_required_procs)
+
+plt.figure()
+width=0.25
+x = np.arange(len(target_successes))
+plt.bar(x-0.5*width, est_required_procs, width, label="Estimation", color="blue")
+plt.bar(x+0.5*width, sim_required_procs, width, label="Simulation", color="orange")
+plt.xlabel("Target success rate")
+plt.ylabel("Required processes")
+plt.xticks(x, target_successes)
+plt.legend()
+plt.grid()
+plt.savefig("figures/scaling/static-resource-processes.png")
 
 # Varying target success rate ----------------------------------------------------
 comp_unit = 6
