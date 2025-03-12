@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <iomanip>
 #include "art_simple.h"
+#include "mlem_simple.h"
+#include "sirt_simple.h"
 #include "hdf5.h"
 
 #include "veloc.hpp"
@@ -43,6 +45,22 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     }
 
     return transposed;
+}
+
+void recon_simple(std::string method, const float* data, int dy, int dt, int dx, 
+                    const float* center, const float* theta, float* recon,
+                    int ngridx, int ngridy, int num_iter) {
+    
+    if (method == "art") {
+        art(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else if (method == "sirt") {
+        sirt(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else if (method == "mlem") {
+        mlem(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else {
+        std::cerr << "Unknown reconstruction method: " << method << std::endl;
+        exit(1)
+    }
 }
 
 // Save the reconstruction image as an HDF5 file
@@ -103,8 +121,8 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
 int main(int argc, char* argv[])
 {
 
-    if(argc != 10) {
-        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> <allow_restart> [veloc config]" << std::endl;
+    if(argc != 11) {
+        std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> <allow_restart> <recon_method> [veloc config]" << std::endl;
         return 1;
     }
 
@@ -118,7 +136,10 @@ int main(int argc, char* argv[])
     int nslices = atoi(argv[6]);
     float failure_prob = atof(argv[7]);
     bool allow_restart = atoi(argv[8]) == 1 ? true : false;
-    const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
+    std::string recon_method(argv[9]);
+    const char* check_point_config = (argc == 11) ? argv[10] : "art_simple.cfg";
+
+    std::cout << "Reconstruction Method: " << recon_method << std::endl;
 
     std::cout << "Reading data..." << std::endl;
 
@@ -806,7 +827,8 @@ int main(int argc, char* argv[])
             // art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
             float * ws_data = local_data + (num_rows - ws)*dt*dx;
             float * ws_local_recon = local_recon + (num_rows-ws)*sinogram_size;
-            art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+            // art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+            recon_simple(recon_method, ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
             for (int i = num_rows-ws; i < num_rows; ++i) {
                 local_progress[i]++; 
             }
