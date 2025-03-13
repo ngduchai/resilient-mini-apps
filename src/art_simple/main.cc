@@ -259,6 +259,11 @@ int main(int argc, char* argv[])
     int *row_indexes = new int[dy];
     int *local_progress = new int[recon_size];
 
+    // Ensure recon is initialized for MLEM
+    if (recon_method == "mlem") {
+        memset(local_recon, 1, recon_size * sizeof(float));
+    }
+
 
     /* Initiate MPI Communication */
     MPI_Init(&argc, &argv);

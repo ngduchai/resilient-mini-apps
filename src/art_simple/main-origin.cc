@@ -2,6 +2,7 @@
 #include <sstream>
 #include "tomo_recon.h"
 #include "hdf5.h"
+#include <cstring>  // For memset
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
@@ -123,6 +124,9 @@ int main(int argc, char* argv[])
     //int num_outer_iter = 5;
     //float center = 294.078;
     float *recon = new float[dy*ngridx*ngridy];
+    if (recon_method == "mlem") {
+        memset(recon, 1, dy*ngridx*ngridy * sizeof(float));
+    }
 
     if(check_point_path != nullptr) {
         std::cout << "Check point path: " << check_point_path << std::endl;
