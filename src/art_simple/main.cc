@@ -2,9 +2,8 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
-#include "art_simple.h"
-#include "mlem_simple.h"
-#include "sirt_simple.h"
+// #include "art_simple.h"
+#include "tomo_recon.h"
 #include "hdf5.h"
 
 #include "veloc.hpp"
@@ -59,7 +58,7 @@ void recon_simple(std::string method, const float* data, int dy, int dt, int dx,
         mlem(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
     }else {
         std::cerr << "Unknown reconstruction method: " << method << std::endl;
-        exit(1)
+        exit(1);
     }
 }
 
@@ -851,7 +850,8 @@ int main(int argc, char* argv[])
     std::chrono::duration<double> recon_elapsed = recon_end - recon_start;
     double recon_time = recon_elapsed.count();
 
-    const char * img_name = "recon.h5";
+    // const char * img_name = "recon.h5";
+    const char * img_name = "recon";
     if (id == mpi_root) {
         std::cout << "Reconstructed data from workers" << std::endl;
     }
@@ -896,7 +896,7 @@ int main(int argc, char* argv[])
         // write the reconstructed data to a file
         // Create the output file name
         std::ostringstream oss;
-        oss << img_name;
+        oss << img_name << "-" << recon_method << ".h5";
         std::string output_filename = oss.str();
         const char* output_filename_cstr = output_filename.c_str();
 
@@ -906,7 +906,7 @@ int main(int argc, char* argv[])
             return 1;
         }
         else{
-            std::cout << "Save the reconstruction image as " << img_name << std::endl;
+            std::cout << "Save the reconstruction image as " << oss.str() << std::endl;
         }
 
     }
