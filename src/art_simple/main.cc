@@ -323,6 +323,8 @@ int main(int argc, char* argv[])
     double task_stop_threshold = exp_dist(gen);
     // std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
 
+    double reconstruction_time_per_iter = 0.0;
+
     // std::vector<std::vector<int>> task_states = {
     //     {1, 0, 0, 1, 0, 0, 0, 1, 1, 1},
     //     {0, 0, 0, 1, 0, 0, 0, 0, 1, 1},
@@ -832,7 +834,18 @@ int main(int argc, char* argv[])
             float * ws_data = local_data + (num_rows - ws)*dt*dx;
             float * ws_local_recon = local_recon + (num_rows-ws)*sinogram_size;
             // art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
-            recon_simple(recon_method, ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+            
+            auto current_time = std::chrono::high_resolution_clock::now();
+            double remain_time = task_stop_threshold - (current_time - recon_start).count();
+            if (remain_time < reconstruction_time_per_iter) {
+                // We will crash during reconstruction, try sleep instead
+                std::this_thread::sleep_for(std::chrono::seconds(remain_time));
+            }else{
+                auto iter_start = std::chrono::high_resolution_clock::now();
+                recon_simple(recon_method, ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+                auto iter_end = std::chrono::high_resolution_clock::now();
+                reconstruction_time_per_iter = (iter_end - iter_start).count();
+            }
             for (int i = num_rows-ws; i < num_rows; ++i) {
                 local_progress[i]++; 
             }
