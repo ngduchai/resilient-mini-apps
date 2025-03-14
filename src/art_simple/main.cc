@@ -17,6 +17,7 @@
 #include <chrono>
 #include <fstream>
 #include <cassert>
+#include <thread>
 
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
@@ -321,9 +322,10 @@ int main(int argc, char* argv[])
     std::mt19937 gen(rd()); // Mersenne Twister engine
     std::exponential_distribution exp_dist(failure_prob); // Distribution for 0 and 1
     double task_stop_threshold = exp_dist(gen);
-    // std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
+    std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
 
     double reconstruction_time_per_iter = 0.0;
+    bool found_crashed = false;
 
     // std::vector<std::vector<int>> task_states = {
     //     {1, 0, 0, 1, 0, 0, 0, 1, 1, 1},
@@ -473,6 +475,7 @@ int main(int argc, char* argv[])
 
             // Reload checkpoints
             if (progress > 0) {
+                // progress--;
                 std::cout << "[Task-" << id << "]: Recover checkpoint " << id << " from progress " << progress << std::endl;
                 num_rows = dy;
                 int v = progress-1;
@@ -498,6 +501,9 @@ int main(int argc, char* argv[])
             task_index = id;
             delete [] num_row_trackers;
             restarted = true;
+
+            // std::exit(1);
+
         }
 
         auto recovery_start = std::chrono::high_resolution_clock::now();
@@ -809,8 +815,40 @@ int main(int argc, char* argv[])
         ckpt_time += ckpt_elapsed_time.count();
         
         exec_start = std::chrono::high_resolution_clock::now();
+
+        // Do the reconstruction
+        if (task_is_active && ws > 0) {
+            std::cout << "[Task-" << id << "]: Outer iteration: " << progress << std::endl;
+            // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
+            // art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
+            float * ws_data = local_data + (num_rows - ws)*dt*dx;
+            float * ws_local_recon = local_recon + (num_rows-ws)*sinogram_size;
+            // art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+            
+            auto current_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> used_time = (current_time - recon_start);
+            double remain_time = task_stop_threshold - used_time.count();
+            // std::cout << "[Task-" << id << "]: Remain time = " << remain_time << std::endl;
+            if (remain_time / ws < reconstruction_time_per_iter) {
+                // We will crash during reconstruction, try sleep instead
+                std::cout << "[Task-" << id << "]: Remain time: " << remain_time << "/" << ws << " = " << remain_time/ws << " < " << reconstruction_time_per_iter << " DONT HAVE ENOUGH TIME TO RECONSTRUCT, SLEEP INTEAD" << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(std::max(1, int(remain_time+1))));
+                found_crashed = true;
+            }else{
+                auto iter_start = std::chrono::high_resolution_clock::now();
+                recon_simple(recon_method, ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
+                auto iter_end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> iter_time = (iter_end - iter_start);
+                reconstruction_time_per_iter = iter_time.count() / ws;
+                for (int i = num_rows-ws; i < num_rows; ++i) {
+                    local_progress[i]++; 
+                }
+                found_crashed = false;
+            }
+        }
+
         elapsed_time = exec_start - recon_start;
-        if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+        if (!restarted && (elapsed_time.count() > task_stop_threshold || found_crashed) && (allow_restart || id != mpi_root)) {
             if (task_is_active) {
                 std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
             }
@@ -825,31 +863,6 @@ int main(int argc, char* argv[])
         //     task_is_active = 0;
         // }
         task_state_history.push_back(task_is_active);
-
-        // Do the reconstruction
-        if (task_is_active && ws > 0) {
-            std::cout << "[Task-" << id << "]: Outer iteration: " << progress << std::endl;
-            // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
-            // art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
-            float * ws_data = local_data + (num_rows - ws)*dt*dx;
-            float * ws_local_recon = local_recon + (num_rows-ws)*sinogram_size;
-            // art(ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
-            
-            auto current_time = std::chrono::high_resolution_clock::now();
-            double remain_time = task_stop_threshold - (current_time - recon_start).count();
-            if (remain_time < reconstruction_time_per_iter) {
-                // We will crash during reconstruction, try sleep instead
-                std::this_thread::sleep_for(std::chrono::seconds(remain_time));
-            }else{
-                auto iter_start = std::chrono::high_resolution_clock::now();
-                recon_simple(recon_method, ws_data, ws, dt, dx, &center, theta, ws_local_recon, ngridx, ngridy, num_iter);
-                auto iter_end = std::chrono::high_resolution_clock::now();
-                reconstruction_time_per_iter = (iter_end - iter_start).count();
-            }
-            for (int i = num_rows-ws; i < num_rows; ++i) {
-                local_progress[i]++; 
-            }
-        }
 
         progress++;
 
