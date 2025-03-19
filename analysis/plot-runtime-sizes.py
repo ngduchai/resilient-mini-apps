@@ -109,7 +109,7 @@ def plot_totaltime_by_size(data, probs, figpath, normalized_value=1):
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
 
-def plot_overhead(data, probs, figpath):
+def plot_overhead_with_mttf(data, probs, figpath):
   width = 0.15
   # plt.figure(figsize=(10, 6))
   plt.figure()
@@ -171,6 +171,72 @@ def plot_overhead(data, probs, figpath):
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
 
+# Making a plot showing the checkpoint overhead varying input data size
+def plot_overhead_breakdown(data, prob, figpath):
+  width = 0.15
+  # plt.figure(figsize=(10, 6))
+  plt.figure()
+  m = -1.5
+  total_times = []
+  compute_times = []
+  ckpt_times = []
+  comm_times = []
+
+  sizes = ["640", "1280", "2k"]
+
+  normalized_value = {}
+  for size in sizes:
+    found_normalized_value = False
+    for info in data[size]["elapsed-time"]:
+      if info["prob"] == 0:
+        normalized_value[size] = info["total"]
+        found_normalized_value = True
+        break
+    if not found_normalized_value:
+      normalized_value[size] = 0
+
+  for size in sizes:
+    found_prob = False
+    for info in data[size]["elapsed-time"]:
+      if prob == info["prob"]:
+        total_times.append(info["total"] / normalized_value[size])
+        compute_times.append(info["exec"] / normalized_value[size])
+        ckpt_times.append(info["ckpt"] / normalized_value[size])
+        comm_times.append(info["comm"] / normalized_value[size])
+        found_prob = True
+        break
+    if not found_prob:
+      total_times.append(0)
+      compute_times.append(0)
+      ckpt_times.append(0)
+      comm_times.append(0)
+  
+  # compute_times = np.array(compute_times) / normalized_value
+  # ckpt_times = np.array(ckpt_times) / normalized_value
+  # comm_times = np.array(comm_times) / normalized_value
+  compute_times = np.array(compute_times)
+  ckpt_times = np.array(ckpt_times)
+  comm_times = np.array(comm_times)
+  
+  x = np.arange(len(sizes))
+  
+  plt.bar(x-width, compute_times, width, facecolor="none", edgecolor="green", hatch="//", label="Reconstruction")
+  plt.bar(x, ckpt_times, width, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
+  plt.bar(x+width, comm_times, width, facecolor="none", edgecolor="blue", hatch="\\", label="Communication")
+  
+  plt.xlabel("Reconstruction Size")
+  # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
+  plt.xticks(np.arange(len(sizes)), sizes)
+  plt.ylabel("Normalized Elapsed Time")
+  plt.yscale("log")
+  plt.ylim((0, 100))
+  plt.grid(True)
+  
+  plt.legend(loc="best")
+  plt.tight_layout()
+  plt.savefig(figpath + ".png")
+  plt.savefig(figpath + ".pdf")
+
 if __name__ == "__main__":
 
   # python plot-runtime-sizes.py data/execinfo-runtimes-sizes.json figures/runtime
@@ -196,7 +262,8 @@ if __name__ == "__main__":
 
   # plot_totaltime_by_prob(plotdata["sizes"], probs, figpath + "/elapsed-time-resilient-sizes")
   plot_totaltime_by_size(plotdata["sizes"], probs, figpath + "/elapsed-time-resilient-sizes")
-  plot_overhead(plotdata["sizes"], probs, figpath + "/elapsed-time-breakdown-sizes")
+  # plot_overhead_with_mttf(plotdata["sizes"], probs, figpath + "/elapsed-time-breakdown-sizes")
+  plot_overhead_breakdown(plotdata["sizes"], 0.001, figpath + "/elapsed-time-breakdown-sizes")
  
 
 
