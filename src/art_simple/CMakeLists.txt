@@ -27,6 +27,7 @@ add_executable(art_simple_failures main-fixed-failures.cc tomo_recon.cc)
 add_executable(art_simple_imbalance_impact main-imbalance-impact.cc tomo_recon.cc)
 add_executable(art_simple_sync_recovery_imbalance main-sync-recovery-imbalance.cc tomo_recon.cc)
 add_executable(art_simple_origin main-origin.cc tomo_recon.cc)
+add_executable(art_simple_rescale main-rescale.cc tomo_recon.cc)
 
 # Link the HDF5 library
 target_link_libraries(art_simple HDF5::HDF5 veloc-client MPI::MPI_CXX)
@@ -42,5 +43,6 @@ target_link_libraries(art_simple_failures HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_imbalance_impact HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_sync_recovery_imbalance HDF5::HDF5 veloc-client MPI::MPI_CXX)
 target_link_libraries(art_simple_origin HDF5::HDF5 veloc-client MPI::MPI_CXX)
+target_link_libraries(art_simple_rescale HDF5::HDF5 veloc-client MPI::MPI_CXX)
 
 
