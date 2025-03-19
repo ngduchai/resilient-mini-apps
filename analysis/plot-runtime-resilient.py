@@ -110,6 +110,24 @@ def simulate_no_resilient_resume_runtime(lamb, num_processes, runtime):
   act_runtime = total_tries / ntries * runtime
   return act_runtime
 
+def simulate_no_resilient_all_resume_runtime(lamb, num_processes, runtime):
+  ntries = 1
+  total_tries = 0
+  if lamb == 0:
+    lamb = 0.00000000001
+  for i in range(ntries):
+    count = 0
+    num_exec = num_processes
+    while num_exec > 0:
+      count += 1
+      process_state = np.random.exponential(scale=1/lamb, size=num_exec)
+      finished = np.sum(np.where(process_state > runtime, 1, 0))
+      # print(i, count, finished, num_processes)
+      num_exec = num_processes - finished
+    total_tries += count
+  act_runtime = total_tries / ntries * runtime
+  return act_runtime
+
 def simulate_resilient_runtime(lamb, num_processes, runtime):
   ntries = 10000
   total_tries = 0
@@ -180,10 +198,14 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
     appdata = data[approach]["elapsed-time"]
     total = []
     for prob in probs:
+      found_data = False
       for info in appdata:
         if prob == info["prob"]:
           total.append(info["total"])
+          found_data = True
           break
+      if not found_data:
+        total.append(10000000000) # Didn't complete
     x = np.arange(len(probs))
     total = np.array(total)
     plt.bar(x + width*m, total/normalized_value, width, facecolor="none", edgecolor=appconf["color"], hatch="//", label=appconf["label"])
@@ -194,12 +216,13 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
   plt.xticks(np.arange(len(probs)), ["$\infty$" if prob == 0 else int(round(1/prob)) for prob in probs])
   if normalized_value == 1:
     plt.ylabel("Reconstrucution Time (sec)")
+    # plt.ylim(1, 2000000000) # A year
     plt.ylim(1, 200000) # A year
   else:
     plt.ylabel("Normalized Reconstruction Time")
     # plt.ylim(1, 31536000) # A year
     plt.ylim(1, 200000) # A year
-  plt.yscale("log")
+  # plt.yscale("log")
   plt.grid(True)
   
   
@@ -210,7 +233,7 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
 
 if __name__ == "__main__":
 
-  # python plot-runtime-scalability.py data/execinfo-runtimes-scalability.json figures/runtime
+  # python plot-runtime-resilient.py data/execinfo-runtimes-scalability.json figures/runtime
   
   # lamb = 0.002
   # num_processes = 64
@@ -255,23 +278,34 @@ if __name__ == "__main__":
   no_resilience["color"] = "orange"
   no_resilience["elapsed-time"] = []
 
+  # Small test
+  # precalculated_runtimes = {
+  #   0 : 60,
+  #   0.0001 : 81.12,
+  #   0.001 : 131.7,
+  #   0.01 : 387.3,
+  #   0.1 : 116109.54
+  # }
+
+  # Allow individual process to complete separately
   precalculated_runtimes = {
-    0 : 60,
-    0.0001 : 81.12,
-    0.001 : 131.7,
-    0.01 : 387.3,
-    0.1 : 116109.54
+    0 : 2374.01,
+    0.00001 : 4258.973940000001,
+    0.0001 : 8494.20778,
+    0.001 : 115638.0271,
+    0.01 : 10000000000 # 259200 # Wall time = 3 days
   }
 
   ideal_exec_time = plotdata["baseline"]["total"]
-  probs = [0, 0.00001, 0.0001, 0.001]
+  probs = [0, 0.00001, 0.0001, 0.001, 0.01]
   for prob in probs:
     info = {}
     info["prob"] = prob
     # info["total"] = exp_no_resilient_runtime(prob, 64, ideal_exec_time)
-    info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
-    print(prob, info["total"])
-    # info["total"] = precalculated_runtimes[prob]
+    # info["total"] = simulate_no_resilient_resume_runtime(prob, 64, ideal_exec_time)
+    # info["total"] = simulate_no_resilient_all_resume_runtime(prob, 64, ideal_exec_time)
+    # print(prob, info["total"])
+    info["total"] = precalculated_runtimes[prob]
     no_resilience["elapsed-time"].append(info)
   print(no_resilience)
   plotdata["approaches"]["no-resilient"] = no_resilience
