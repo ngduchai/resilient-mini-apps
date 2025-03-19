@@ -32,21 +32,6 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     return transposed;
 }
 
-void recon_simple(std::string method, const float* data, int dy, int dt, int dx, 
-                    const float* center, const float* theta, float* recon,
-                    int ngridx, int ngridy, int num_iter) {
-    
-    if (method == "art") {
-        art(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else if (method == "sirt") {
-        sirt(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else if (method == "mlem") {
-        mlem(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else {
-        std::cerr << "Unknown reconstruction method: " << method << std::endl;
-        exit(1);
-    }
-}
 
 // cmd: ./art_simple_origin ../../../data/tooth_preprocessed.h5 294.078 5 2 [art|sirt|mlem]
 

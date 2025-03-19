@@ -786,4 +786,23 @@ sirt(const float* data, int dy, int dt, int dx, const float* center, const float
     free(indi);
 }
 
+//======================================================================================//
+
+
+void recon_simple(std::string method, const float* data, int dy, int dt, int dx, 
+                    const float* center, const float* theta, float* recon,
+                    int ngridx, int ngridy, int num_iter) {
+    
+    if (method == "art") {
+        art(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else if (method == "sirt") {
+        sirt(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else if (method == "mlem") {
+        mlem(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
+    }else {
+        std::cerr << "Unknown reconstruction method: " << method << std::endl;
+        exit(1);
+    }
+}
+
 

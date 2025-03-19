@@ -47,22 +47,6 @@ float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) 
     return transposed;
 }
 
-void recon_simple(std::string method, const float* data, int dy, int dt, int dx, 
-                    const float* center, const float* theta, float* recon,
-                    int ngridx, int ngridy, int num_iter) {
-    
-    if (method == "art") {
-        art(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else if (method == "sirt") {
-        sirt(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else if (method == "mlem") {
-        mlem(data, dy, dt, dx, center, theta, recon, ngridx, ngridy, num_iter);
-    }else {
-        std::cerr << "Unknown reconstruction method: " << method << std::endl;
-        exit(1);
-    }
-}
-
 // Save the reconstruction image as an HDF5 file
 int saveAsHDF5(const char* fname, float* recon, hsize_t* output_dims) {
     hid_t output_file_id = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -529,6 +513,7 @@ int main(int argc, char* argv[])
                     // unsigned int ckpt_id = removed_tasks[removed_tasks.size()*j + task_index];
                     unsigned int ckpt_id = removed_tasks[active_tasks*j + task_index];
                     std::cout << "[Task-" << id << "]: Recover checkpoint " << ckpt_id << " from progress " << v << std::endl;
+                    ckpt->checkpoint_wait();
                     recover(ckpt, ckpt_id, ckpt_name, sinogram_size, v, &ckpt_size, numread, local_recon+num_rows*sinogram_size, row_indexes+num_rows, local_progress+num_rows);
                     std::cout << "[Task-" << id << "]: Recovery completed, checkpoint: " << ckpt_id << ", progress: " << v << " num_row: " << numread << " num_ckpt: " << ckpt_size << std::endl;
                     // Update input data for tasks receiving new slices
@@ -847,8 +832,21 @@ int main(int argc, char* argv[])
             }
         }
 
-        elapsed_time = exec_start - recon_start;
-        if (!restarted && (elapsed_time.count() > task_stop_threshold || found_crashed) && (allow_restart || id != mpi_root)) {
+        // Make sure the partial progress is saved in case some task failed right after the restart
+        if (restarted) {
+            ckpt->checkpoint_wait();
+            if (!ckpt->checkpoint(ckpt_name, progress)) {
+                std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
+                throw std::runtime_error("Checkpointing failured");
+            }
+            std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
+        }
+
+        progress++;
+
+        elapsed_time = std::chrono::high_resolution_clock::now() - recon_start;
+        // if (!restarted && (elapsed_time.count() > task_stop_threshold || found_crashed) && (allow_restart || id != mpi_root)) {
+        if ((elapsed_time.count() > task_stop_threshold || found_crashed) && (allow_restart || id != mpi_root)) {
             if (task_is_active) {
                 std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
             }
@@ -856,6 +854,7 @@ int main(int argc, char* argv[])
         }else{
             task_is_active = 1;
         }
+
         // if (progress == 0 && id > 8) {
         //     task_is_active = 0;
         // }
@@ -863,8 +862,6 @@ int main(int argc, char* argv[])
         //     task_is_active = 0;
         // }
         task_state_history.push_back(task_is_active);
-
-        progress++;
 
     }
 

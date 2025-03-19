@@ -17,6 +17,8 @@
 #include <chrono>
 #include <fstream>
 
+#include <thread>
+
 // Function to swap dimensions of a flat 3D array
 float* swapDimensions(float* original, int x, int y, int z, int dim1, int dim2) {
     float* transposed= new float[x*y*z];
@@ -102,7 +104,7 @@ void recover(veloc::client_t *ckpt, int id, const char *name,  int sinogram_size
 int main(int argc, char* argv[])
 {
 
-    if(argc != 10) {
+    if(argc != 11) {
         std::cerr << "Usage: " << argv[0] << " <filename> <center> <num_outer_iter> <num_iter> <beginning_sino> <num_sino> <failure_prob> <allow_restart> [veloc config]" << std::endl;
         return 1;
     }
@@ -117,7 +119,8 @@ int main(int argc, char* argv[])
     int nslices = atoi(argv[6]);
     float failure_prob = atof(argv[7]);
     bool allow_restart = atoi(argv[8]) == 1 ? true : false;
-    const char* check_point_config = (argc == 10) ? argv[9] : "art_simple.cfg";
+    std::string recon_method(argv[9]);
+    const char* check_point_config = (argc == 11) ? argv[10] : "art_simple.cfg";
 
     std::cout << "Reading data..." << std::endl;
 
@@ -237,6 +240,11 @@ int main(int argc, char* argv[])
     float *local_data = new float[dx*dy*dt];
     int *row_indexes = new int[dy];
 
+    // Ensure recon is initialized for MLEM
+    if (recon_method == "mlem") {
+        memset(local_recon, 1, recon_size * sizeof(float));
+    }
+
 
     /* Initiate MPI Communication */
     MPI_Init(&argc, &argv);
@@ -290,6 +298,9 @@ int main(int argc, char* argv[])
     double task_stop_threshold = exp_dist(gen);
     // double task_stop_threshold = failure_prob * (num_tasks - id);
     std::cout << "[Task-" << id << "] will stop in the next " << task_stop_threshold << " second(s)." << std::endl;
+
+    double reconstruction_time_per_iter = 0.0;
+    bool found_crashed = false;
 
     // std::vector<std::vector<int>> task_states = {
     //     {1, 0, 0, 1, 0, 0, 0, 1, 1, 1},
@@ -364,7 +375,8 @@ int main(int argc, char* argv[])
     std::vector<int> added_tasks, removed_tasks;
 
     // run the reconstruction
-    while (progress < num_outer_iter+1) {
+    // while (progress < num_outer_iter+1) {
+    while (true) {
         // We need one extra iteration to ensure all rows are sync with the expected number of iterations
         
         // MPI_Barrier(MPI_COMM_WORLD);
@@ -461,6 +473,9 @@ int main(int argc, char* argv[])
             active_tasks = num_tasks;
             delete [] num_row_trackers;
             restarted = true;
+            for (int j = 0; j < tracker_size; ++j) {
+                active_tracker[j] = 1;
+            }
         }
 
         auto recovery_start = std::chrono::high_resolution_clock::now();
@@ -680,7 +695,8 @@ int main(int argc, char* argv[])
                     // std::cout << "Recover size: " << recovered_size << std::endl;
                     // Reconstruct from checkpoints
                     if (recovered_size > 0) {
-                        art(tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
+                        // art(tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
+                        recon_simple(recon_method, tmp_data, recovered_size, dt, dx, &center, theta, local_recovered_recon, ngridx, ngridy, num_iter);
                         for (int i=0; i < recovered_size; ++i) {
                             local_ckpt_progress[i]++;
                         }
@@ -767,10 +783,15 @@ int main(int argc, char* argv[])
             }
         }
 
+        if (progress == num_outer_iter+1) {
+            break;
+        }
+
         // Save progress with checkpoint
         num_ckpt = active_tasks;
         auto ckpt_start = std::chrono::high_resolution_clock::now();
-        if (task_is_active && !restarted) {
+        // if (task_is_active && !restarted) {
+        if (task_is_active) {
             ckpt->checkpoint_wait();
             if (!ckpt->checkpoint(ckpt_name, progress)) {
                 std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
@@ -782,31 +803,60 @@ int main(int argc, char* argv[])
         std::chrono::duration<double> ckpt_elapsed_time = ckpt_end - ckpt_start;
         ckpt_time += ckpt_elapsed_time.count();
 
-        if (!recovered_from_ckpt) {
-            exec_start = std::chrono::high_resolution_clock::now();
-            elapsed_time = exec_start - recon_start;
-            if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
-                if (task_is_active == 1) {
-                    std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
-                }
-                task_is_active = 0;
-            }else{
-                task_is_active = 1;
-            }
-            task_state_history.push_back(task_is_active);
-        }
-
-        recovered_from_ckpt = false;
+        exec_start = std::chrono::high_resolution_clock::now();
 
 
         // Do the reconstruction
         if (task_is_active && progress < num_outer_iter && num_rows > 0) {
             std::cout<< "[task-" << id << "]: Outer iteration: " << progress << std::endl;
             // art(data_swap, w_dy, w_dt, w_dx, &center, theta, w_recon, w_ngridx, w_ngridy, num_iter);
-            art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
+            // art(local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
+
+            auto current_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> used_time = (current_time - recon_start);
+            double remain_time = task_stop_threshold - used_time.count();
+            // std::cout << "[Task-" << id << "]: Remain time = " << remain_time << std::endl;
+            if (remain_time / num_rows < reconstruction_time_per_iter) {
+                // We will crash during reconstruction, try sleep instead
+                std::cout << "[Task-" << id << "]: Remain time: " << remain_time << "/" << num_rows << " = " << remain_time/num_rows << " < " << reconstruction_time_per_iter << " DONT HAVE ENOUGH TIME TO RECONSTRUCT, SLEEP INTEAD" << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(std::max(1, int(remain_time+1))));
+                found_crashed = true;
+            }else{
+                auto iter_start = std::chrono::high_resolution_clock::now();
+                recon_simple(recon_method,local_data, num_rows, dt, dx, &center, theta, local_recon, ngridx, ngridy, num_iter);
+                auto iter_end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> iter_time = (iter_end - iter_start);
+                reconstruction_time_per_iter = iter_time.count() / num_rows;
+                found_crashed = false;
+            }
+
         }
 
+        // // Make sure the partial progress is saved in case some task failed right after the restart
+        // if (restarted) {
+        //     ckpt->checkpoint_wait();
+        //     if (!ckpt->checkpoint(ckpt_name, progress)) {
+        //         std::cout << "[Task-" << id << "] cannot checkpoint: numrow: " << num_rows << " progress " << progress << std::endl;
+        //         throw std::runtime_error("Checkpointing failured");
+        //     }
+        //     std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
+        // }
+
         progress++;
+
+        elapsed_time = std::chrono::high_resolution_clock::now() - recon_start;
+        // if (!restarted && elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+        if (elapsed_time.count() > task_stop_threshold && (allow_restart || id != mpi_root)) {
+            if (task_is_active == 1) {
+                std::cout << "WARNING: Task " << id << " has stopped." << std::endl;
+            }
+            task_is_active = 0;
+        }else{
+            task_is_active = 1;
+        }
+        task_state_history.push_back(task_is_active);
+
+        recovered_from_ckpt = false;
 
     }
 
@@ -824,7 +874,7 @@ int main(int argc, char* argv[])
     double recon_time = recon_elapsed.count();
 
 
-    const char * img_name = "recon.h5";
+    const char * img_name = "recon";
     if (id == mpi_root) {
         std::cout << "Reconstructed data from workers" << std::endl;
     }
@@ -870,7 +920,7 @@ int main(int argc, char* argv[])
         // write the reconstructed data to a file
         // Create the output file name
         std::ostringstream oss;
-        oss << img_name;
+        oss << img_name << "-" << recon_method << ".h5";
         std::string output_filename = oss.str();
         const char* output_filename_cstr = output_filename.c_str();
 
@@ -897,6 +947,7 @@ int main(int argc, char* argv[])
             ofile << "\"failure_gaps\" : " << failure_prob << "," << std::endl;
             ofile << "\"nprocs\" : " << num_tasks << "," << std::endl;
             ofile << "\"nslices\" : " << nslices << "," << std::endl;
+            ofile << "\"recon_method\" : \"" << recon_method << "\"," << std::endl;
             ofile << "\"approach\" : " << "\"ckpt-sync-recovery-imbalance\"" << "," << std::endl;
             ofile << "\"num_iter\" : " << num_outer_iter*num_iter << "," << std::endl;
             ofile << "\"allow_restart\" : " << allow_restart << "," << std::endl;

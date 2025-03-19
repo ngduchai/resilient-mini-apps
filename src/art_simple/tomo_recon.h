@@ -27,4 +27,14 @@ void sirt(const float* data,
          int ngridx, int ngridy, 
          int num_iter);
 
+void recon_simple(std::string method,
+        const float* data,
+        int dy, int dt, int dx, 
+        const float* center,
+        const float* theta,
+        float* recon,
+        int ngridx, int ngridy,
+        int num_iter);
+    
+
 #endif // TOMO_RECON_H
