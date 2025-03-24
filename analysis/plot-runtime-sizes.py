@@ -20,6 +20,7 @@ def plot_totaltime_by_prob(data, probs, figpath, normalized_value=1):
   plt.figure()
   m = -1.5
   sizes = ["640", "1280", "2k"]
+  
   # for approach in data:
   for size in sizes:
     appconf = data[size]
@@ -59,7 +60,7 @@ def plot_totaltime_by_prob(data, probs, figpath, normalized_value=1):
   plt.savefig(figpath + ".png")
   plt.savefig(figpath + ".pdf")
 
-def plot_totaltime_by_size(data, probs, figpath, normalized_value=1):
+def plot_totaltime_by_size(data, probs, figpath):
   width = 0.15
   # plt.figure(figsize=(10, 6))
   plt.figure()
@@ -70,6 +71,18 @@ def plot_totaltime_by_size(data, probs, figpath, normalized_value=1):
     0.001 : "blue",
     0.01: "green"
   }
+
+  normalized_value = {}
+  for size in sizes:
+    found_normalized_value = False
+    for info in data[size]["elapsed-time"]:
+      if info["prob"] == 0:
+        normalized_value[size] = info["total"]
+        found_normalized_value = True
+        break
+    if not found_normalized_value:
+      normalized_value[size] = 1
+
   # for approach in data:
   for prob in probs:
     total = []
@@ -79,27 +92,22 @@ def plot_totaltime_by_size(data, probs, figpath, normalized_value=1):
       found_data = False
       for info in appdata:
         if prob == info["prob"]:
-          total.append(info["total"])
+          total.append(info["total"] / normalized_value[size])
           found_data = True
           break
       if not found_data:
         total.append(0) # No data available, plot zero.
     x = np.arange(len(probs))
     total = np.array(total)
-    plt.bar(x + width*(m+0.5), total/normalized_value, width, facecolor="none", edgecolor=colors[prob], hatch="//", label="MTTF = " + ("$\infty$" if prob == 0 else str(int(round(1/prob)))))
-    print(total/normalized_value)
+    plt.bar(x + width*(m+0.5), total, width, facecolor="none", edgecolor=colors[prob], hatch="//", label="MTTF = " + ("$\infty$" if prob == 0 else str(int(round(1/prob))) + " sec"))
+    print(total)
     m += 1
-  plt.xlabel("Reconstruction Size")
+  plt.xlabel("Sinogram Size")
   # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
   plt.xticks(range(len(sizes)), [data[size]["label"] for size in sizes])
-  if normalized_value == 1:
-    plt.ylabel("Reconstrucution Time (sec)")
-    # plt.ylim(1, 200000) # A year
-  else:
-    plt.ylabel("Normalized Reconstruction Time")
-    # plt.ylim(1, 31536000) # A year
-    # plt.ylim(1, 200000) # A year
-    # plt.ylim(1, 25000) # A year
+  plt.ylabel("Normalized Reconstruction Time")
+  plt.ylim(0.1, 100)
+  
   plt.yscale("log")
   plt.grid(True)
   
@@ -153,7 +161,7 @@ def plot_overhead_with_mttf(data, probs, figpath):
     x = np.arange(len(sizes))
     print(overhead[prob])
     overhead[prob] = np.array(overhead[prob])
-    plt.bar(x + width*(m+0.5), overhead[prob], width, facecolor="none", edgecolor=colors[prob], hatch="//", label="MTTF = " + ("$\infty$" if prob == 0 else str(int(round(1/prob)))))
+    plt.bar(x + width*(m+0.5), overhead[prob], width, facecolor="none", edgecolor=colors[prob], hatch="//", label="MTTF = " + ("$\infty$" if prob == 0 else str(int(round(1/prob))) + " sec"))
     m += 1
   
   plt.xlabel("Reconstruction Size")
@@ -193,7 +201,7 @@ def plot_overhead_breakdown(data, prob, figpath):
         found_normalized_value = True
         break
     if not found_normalized_value:
-      normalized_value[size] = 0
+      normalized_value[size] = 1
 
   for size in sizes:
     found_prob = False
@@ -223,10 +231,14 @@ def plot_overhead_breakdown(data, prob, figpath):
   plt.bar(x-width, compute_times, width, facecolor="none", edgecolor="green", hatch="//", label="Reconstruction")
   plt.bar(x, ckpt_times, width, facecolor="none", edgecolor="orange", hatch="*", label="Checkpointing")
   plt.bar(x+width, comm_times, width, facecolor="none", edgecolor="blue", hatch="\\", label="Communication")
+
+  print(compute_times)
+  print(ckpt_times)
+  print(comm_times)
   
-  plt.xlabel("Reconstruction Size")
+  plt.xlabel("Sinogram Size")
   # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
-  plt.xticks(np.arange(len(sizes)), sizes)
+  plt.xticks(np.arange(len(sizes)), [data[size]["label"] for size in sizes])
   plt.ylabel("Normalized Elapsed Time")
   plt.yscale("log")
   plt.ylim((0, 100))

@@ -13,39 +13,54 @@ import os
 
 import scipy.stats as stats
 
-def plot_totaltime(data, probs, figpath, normalized_value=1):
+def plot_totaltime(data, probs, figpath):
   width = 0.15
   # plt.figure(figsize=(10, 6))
   plt.figure()
-  m = -1.5
-  tomos = ["art", "sirt", "mlem"]
+  m = -1
+  tomos = ["shale", "chip"]
+
+  normalized_value = {}
+  for tomo in tomos:
+    found_normalized_value = False
+    for info in data[tomo]["elapsed-time"]:
+      if info["prob"] == 0:
+        normalized_value[tomo] = info["total"]
+        found_normalized_value = True
+        break
+    if not found_normalized_value:
+      normalized_value[tomo] = 1
+
   # for approach in data:
   for tomo in tomos:
     appconf = data[tomo]
     appdata = data[tomo]["elapsed-time"]
     total = []
     for prob in probs:
+      found_prob = False
       for info in appdata:
         if prob == info["prob"]:
-          total.append(info["total"])
+          total.append(info["total"] / normalized_value[tomo])
+          found_prob = True
           break
+      if not found_prob:
+        total.append(0)
     x = np.arange(len(probs))
     total = np.array(total)
-    plt.bar(x + width*(m+0.5), total/normalized_value, width, facecolor="none", edgecolor=appconf["color"], hatch="//", label=appconf["label"])
-    print(total/normalized_value)
+    plt.bar(x + width*(m+0.5), total, width, facecolor="none", edgecolor=appconf["color"], hatch="//", label=appconf["label"])
+    print(total)
     m += 1
   plt.xlabel("Mean Time to Failure (sec)")
   # plt.xticks(np.arange(len(probs)), 1/np.array(probs))
   plt.xticks(np.arange(len(probs)), ["$\infty$" if prob == 0 else int(round(1/prob)) for prob in probs])
-  if normalized_value == 1:
-    plt.ylabel("Reconstrucution Time (sec)")
-    # plt.ylim(1, 200000) # A year
-  else:
-    plt.ylabel("Normalized Reconstruction Time")
-    # plt.ylim(1, 31536000) # A year
-    # plt.ylim(1, 200000) # A year
-    # plt.ylim(1, 25000) # A year
-  # plt.yscale("log")
+  
+  # plt.ylabel("Reconstrucution Time (sec)")
+  plt.ylabel("Normalized Reconstruction Time")
+  # plt.ylim(1, 31536000) # A year
+  # plt.ylim(1, 200000) # A year
+  # plt.ylim(1, 25000) # A year
+  plt.ylim(0.1, 100) # A year
+  plt.yscale("log")
   plt.grid(True)
   
   
@@ -56,7 +71,7 @@ def plot_totaltime(data, probs, figpath, normalized_value=1):
 
 if __name__ == "__main__":
 
-  # python plot-runtime-tomo.py data/execinfo-runtimes-tomo.json figures/runtime
+  # python plot-runtime-datasets.py data/execinfo-runtimes-datasets.json figures/runtime
   
 
 
@@ -78,7 +93,7 @@ if __name__ == "__main__":
   # probs = [0, 0.00001, 0.0001, 0.001]
   
 
-  plot_totaltime(plotdata["tomos"], probs, figpath + "/elapsed-time-resilient-tomos")
+  plot_totaltime(plotdata["datasets"], probs, figpath + "/elapsed-time-resilient-datasets")
 
  
 
