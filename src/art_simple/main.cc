@@ -833,6 +833,7 @@ int main(int argc, char* argv[])
         }
 
         // Make sure the partial progress is saved in case some task failed right after the restart
+        auto ckpt_start = std::chrono::high_resolution_clock::now();
         if (restarted) {
             ckpt->checkpoint_wait();
             if (!ckpt->checkpoint(ckpt_name, progress)) {
@@ -841,6 +842,9 @@ int main(int argc, char* argv[])
             }
             std::cout << "[task-" << id << "]: Checkpointed version " << progress << std::endl;
         }
+        auto ckpt_end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> ckpt_elapsed_time = ckpt_end - ckpt_start;
+        ckpt_time += ckpt_elapsed_time.count();
 
         progress++;
 
